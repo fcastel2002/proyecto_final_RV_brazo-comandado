@@ -52,7 +52,7 @@ Actualmente en fase de desarrollo inicial:
 
 ## 📄 Licencia
 
-Este proyecto se distribuye bajo la licencia **[MIT]** (o la que elijas).  
+Este proyecto se distribuye bajo la licencia **[Apache 2.0]**.  
 Consulta el archivo `LICENSE` para más detalles.
 
 
