@@ -1,12 +1,12 @@
 # === Unity ===
-EntornoVirtualPlanta/[Ll]ibrary/
-EntornoVirtualPlanta/[Tt]emp/
-EntornoVirtualPlanta/[Oo]bj/
-EntornoVirtualPlanta/[Bb]uild*/
-EntornoVirtualPlanta/[Ll]ogs/
-EntornoVirtualPlanta/[Mm]emoryCaptures/
-EntornoVirtualPlanta/UserSettings/
-EntornoVirtualPlanta/sysinfo.txt
+Planta_BrazoRobótico/[Ll]ibrary/
+Planta_BrazoRobótico/[Tt]emp/
+Planta_BrazoRobótico/[Oo]bj/
+Planta_BrazoRobótico/[Bb]uild*/
+Planta_BrazoRobótico/[Ll]ogs/
+Planta_BrazoRobótico/[Mm]emoryCaptures/
+Planta_BrazoRobótico/UserSettings/
+Planta_BrazoRobótico/sysinfo.txt
 
 # === Visual Studio / Rider ===
 .vscode/
