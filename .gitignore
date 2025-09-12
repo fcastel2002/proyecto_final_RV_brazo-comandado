@@ -1,0 +1,44 @@
+# === Unity ===
+EntornoVirtualPlanta/[Ll]ibrary/
+EntornoVirtualPlanta/[Tt]emp/
+EntornoVirtualPlanta/[Oo]bj/
+EntornoVirtualPlanta/[Bb]uild*/
+EntornoVirtualPlanta/[Ll]ogs/
+EntornoVirtualPlanta/[Mm]emoryCaptures/
+EntornoVirtualPlanta/UserSettings/
+EntornoVirtualPlanta/sysinfo.txt
+
+# === Visual Studio / Rider ===
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+
+# === OS Specific ===
+.DS_Store
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# === Auto-generated backups ===
+*.bak
+*.swp
+*.tmp
+*.orig
+*.old
+*.log
+
+# === Crash Reports ===
+*.stacktrace
+*.crash
