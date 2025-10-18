@@ -1,0 +1,3 @@
+[submodule "Joystick/joystick/firmware/src/proto/joystick_vr/external/tinyusb"]
+	path = Joystick/joystick/firmware/src/proto/joystick_vr/external/tinyusb
+	url = https://github.com/hathach/tinyusb
