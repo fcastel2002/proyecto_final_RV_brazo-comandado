@@ -16,18 +16,18 @@ void blink_pin_forever(PIO pio, uint sm, uint offset, uint pin, uint freq) {
 }
 
 
-
 int main()
 {
     stdio_init_all();
+    PIO pio = pio0;
 
     // PIO Blinking example
-    PIO pio = pio0;
+    
     uint offset = pio_add_program(pio, &blink_program);
     printf("Loaded program at %d\n", offset);
     
     #ifdef PICO_DEFAULT_LED_PIN
-    blink_pin_forever(pio, 0, offset, PICO_DEFAULT_LED_PIN, 3);
+    blink_pin_forever(pio, 0, offset, PICO_DEFAULT_LED_PIN, 5);
     #else
     blink_pin_forever(pio, 0, offset, 6, 3);
     #endif

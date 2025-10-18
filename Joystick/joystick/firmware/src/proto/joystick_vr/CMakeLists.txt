@@ -17,7 +17,7 @@ else()
 endif()
 set(sdkVersion 2.2.0)
 set(toolchainVersion 14_2_Rel1)
-set(picotoolVersion 2.2.0)
+set(picotoolVersion 2.2.0-a4)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
     include(${picoVscode})
@@ -28,39 +28,39 @@ set(PICO_BOARD pico CACHE STRING "Board type")
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
-project(led_blink_test C CXX ASM)
+project(joystick_vr C CXX ASM)
+
+set(PICO_CXX_ENABLE_RTTI 1)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(led_blink_test led_blink_test.cpp )
+add_executable(joystick_vr 
+joystick_vr.cpp 
+joystick.cpp
+usb_descriptors.c)
 
-pico_set_program_name(led_blink_test "led_blink_test")
-pico_set_program_version(led_blink_test "0.1")
-
-# Generate PIO header
-pico_generate_pio_header(led_blink_test ${CMAKE_CURRENT_LIST_DIR}/blink.pio)
+pico_set_program_name(joystick_vr "joystick_vr")
+pico_set_program_version(joystick_vr "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(led_blink_test 0)
-pico_enable_stdio_usb(led_blink_test 1)
-pico_enable_stdio_semihosting(led_blink_test 0)
+pico_enable_stdio_uart(joystick_vr 1)
+pico_enable_stdio_usb(joystick_vr 0)
 
 # Add the standard library to the build
-target_link_libraries(led_blink_test
-        pico_stdlib)
+target_link_libraries(joystick_vr
+        pico_stdlib
+        hardware_adc
+        tinyusb_device
+        tinyusb_board
+        )
 
 # Add the standard include files to the build
-target_include_directories(led_blink_test PRIVATE
+target_include_directories(joystick_vr PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
 )
 
-# Add any user requested libraries
-target_link_libraries(led_blink_test 
-        hardware_pio
-        )
-
-pico_add_extra_outputs(led_blink_test)
+pico_add_extra_outputs(joystick_vr)
 
