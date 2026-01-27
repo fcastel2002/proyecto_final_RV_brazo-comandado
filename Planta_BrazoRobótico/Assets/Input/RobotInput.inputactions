@@ -1,0 +1,75 @@
+{
+    "version": 1,
+    "name": "RobotInput",
+    "maps": [
+        {
+            "name": "RobotControl",
+            "id": "fa814a1d-fd34-43e0-bf23-910121b362ec",
+            "actions": [
+                {
+                    "name": "Rot_J1",
+                    "type": "Value",
+                    "id": "2537142f-04c3-45c3-8a2c-19f1db921f50",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Rot_J2",
+                    "type": "Value",
+                    "id": "3740fed6-dc69-45d3-b94d-77f465797582",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Rot J3",
+                    "type": "Value",
+                    "id": "6527751a-328b-49ce-a537-cf16303e433c",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "bbe862c0-d2e6-4698-bf51-208de5d2c549",
+                    "path": "<HID::GrupoVRobotics Joystick VR>/z",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Rot_J1",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "652694f3-bf0b-461f-943f-4d1f6e076848",
+                    "path": "<HID::GrupoVRobotics Joystick VR>/stick/x",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Rot_J2",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "75373c79-8404-48c1-ba87-7017a60c0c39",
+                    "path": "<Joystick>/stick/y",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Rot J3",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}

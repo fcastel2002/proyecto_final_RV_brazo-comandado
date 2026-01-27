@@ -40,7 +40,7 @@ pico_sdk_init()
 add_executable(joystick_vr 
 joystick_vr.cpp 
 joystick.cpp
-usb_descriptors.c)
+usb_descriptors.cpp)
 
 pico_set_program_name(joystick_vr "joystick_vr")
 pico_set_program_version(joystick_vr "0.1")
@@ -48,6 +48,7 @@ pico_set_program_version(joystick_vr "0.1")
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(joystick_vr 1)
 pico_enable_stdio_usb(joystick_vr 0)
+
 
 # Add the standard library to the build
 target_link_libraries(joystick_vr
@@ -58,9 +59,17 @@ target_link_libraries(joystick_vr
         )
 
 # Add the standard include files to the build
+
 target_include_directories(joystick_vr PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/external/tinyusb/src
+        ${CMAKE_CURRENT_LIST_DIR}/external/tinyusb/src/class/hid
+        ${CMAKE_CURRENT_LIST_DIR}/external/tinyusb/src/device
+        
 )
 
+target_compile_definitions(joystick_vr PUBLIC
+    CFG_TUSB_CONFIG_FILE="tusb_config.h"
+)
 pico_add_extra_outputs(joystick_vr)
 
