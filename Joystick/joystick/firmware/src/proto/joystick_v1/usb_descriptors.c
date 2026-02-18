@@ -47,7 +47,7 @@ static const uint8_t configuration_descriptor[] = {
 static const char* const string_descriptors[] = {
     (const char[]){0x09, 0x04},
     "GrupoVRobotics",
-    "Joystick VR",
+    "Joystick VR-v2",
     "00001",
 };
 
