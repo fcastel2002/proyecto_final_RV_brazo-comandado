@@ -1,0 +1,75 @@
+{
+    "version": 1,
+    "name": "RobotBasic",
+    "maps": [
+        {
+            "name": "Basico Cartesiano",
+            "id": "56b67b09-e438-454b-b14c-7cf2a6aafb83",
+            "actions": [
+                {
+                    "name": "Mover X",
+                    "type": "Value",
+                    "id": "545a22d2-099a-452d-9170-b1311a5642e6",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Mover Y",
+                    "type": "Value",
+                    "id": "fdf5a182-d09a-4a42-83d8-41b62859b70c",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "Mover Z",
+                    "type": "Value",
+                    "id": "83d8f0d4-61ee-4265-9b4e-802ee09a089f",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "06231da8-b7bc-469c-8d6b-9714d6822230",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/stick/y",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Mover X",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d761d6cf-8969-4092-b028-1167de1cfcbe",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/z",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Mover Y",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1d4d6a5b-eaf4-4f58-80a2-0d9508b25f0b",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/stick/x",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Mover Z",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
