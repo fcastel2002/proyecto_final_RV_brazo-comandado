@@ -74,7 +74,7 @@ public class JoystickAdapter : MonoBehaviour
 
 		// Build a pure-translation 4×4 offset and apply it
 		var offset = Matrix4x4.TRS(delta, Quaternion.identity, Vector3.one);
-		var targetPose = currentPose * offset;
+		var targetPose = offset * currentPose;
 
 		// Reuse the current configuration & external joints
 		var frame = _controller.Frame.Value;
