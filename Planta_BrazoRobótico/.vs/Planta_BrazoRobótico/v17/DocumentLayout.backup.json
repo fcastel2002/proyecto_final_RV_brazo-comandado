@@ -3,12 +3,16 @@
   "WorkspaceRootPath": "D:\\Usuario\\Documents\\GitHub\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|d:\\usuario\\documents\\github\\proyecto_final_rv_brazo-comandado\\planta_brazorob\u00F3tico\\assets\\axisuicontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|solutionrelative:assets\\axisuicontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|d:\\usuario\\documents\\github\\proyecto_final_rv_brazo-comandado\\planta_brazorob\u00F3tico\\assets\\newmonobehaviourscript.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|solutionrelative:assets\\newmonobehaviourscript.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|d:\\usuario\\documents\\github\\proyecto_final_rv_brazo-comandado\\planta_brazorob\u00F3tico\\assets\\joystickadapter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|solutionrelative:assets\\joystickadapter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|D:\\Usuario\\Documents\\GitHub\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\assets\\axisuicontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{C036C123-54B5-6CCD-597F-4FF7A4E72DB7}|Assembly-CSharp.csproj|solutionrelative:assets\\axisuicontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -23,6 +27,19 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "NewMonoBehaviourScript.cs",
+              "DocumentMoniker": "D:\\Usuario\\Documents\\GitHub\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\NewMonoBehaviourScript.cs",
+              "RelativeDocumentMoniker": "Assets\\NewMonoBehaviourScript.cs",
+              "ToolTip": "D:\\Usuario\\Documents\\GitHub\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\NewMonoBehaviourScript.cs",
+              "RelativeToolTip": "Assets\\NewMonoBehaviourScript.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAWAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-23T22:02:09.584Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "AxisUIController.cs",
               "DocumentMoniker": "D:\\Usuario\\Documents\\GitHub\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\AxisUIController.cs",
               "RelativeDocumentMoniker": "Assets\\AxisUIController.cs",
@@ -30,8 +47,7 @@
               "RelativeToolTip": "Assets\\AxisUIController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-02-23T20:49:57.976Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-02-23T20:49:57.976Z"
             },
             {
               "$type": "Document",
@@ -41,7 +57,7 @@
               "RelativeDocumentMoniker": "Assets\\JoystickAdapter.cs",
               "ToolTip": "D:\\Usuario\\Documents\\GitHub\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\JoystickAdapter.cs",
               "RelativeToolTip": "Assets\\JoystickAdapter.cs",
-              "ViewState": "AgIAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAA8AAAAAAAAAAAAIwGAAAAAiAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-02-23T20:10:32.235Z",
               "EditorCaption": ""
