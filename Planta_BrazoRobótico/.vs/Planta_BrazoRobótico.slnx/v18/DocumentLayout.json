@@ -3,8 +3,16 @@
   "WorkspaceRootPath": "D:\\06. Proyectos\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\06. Proyectos\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\JoystickAdapter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Assets\\JoystickAdapter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B4CD19DA-EE08-5225-FB19-1D0DFA4113DD}|Assembly-CSharp.csproj|d:\\06. proyectos\\proyecto_final_rv_brazo-comandado\\planta_brazorob\u00F3tico\\assets\\ctrl_onrobot_rg2_custom.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4CD19DA-EE08-5225-FB19-1D0DFA4113DD}|Assembly-CSharp.csproj|solutionrelative:assets\\ctrl_onrobot_rg2_custom.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B4CD19DA-EE08-5225-FB19-1D0DFA4113DD}|Assembly-CSharp.csproj|d:\\06. proyectos\\proyecto_final_rv_brazo-comandado\\planta_brazorob\u00F3tico\\assets\\grippercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4CD19DA-EE08-5225-FB19-1D0DFA4113DD}|Assembly-CSharp.csproj|solutionrelative:assets\\grippercontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B4CD19DA-EE08-5225-FB19-1D0DFA4113DD}|Assembly-CSharp.csproj|d:\\06. proyectos\\proyecto_final_rv_brazo-comandado\\planta_brazorob\u00F3tico\\assets\\joystickadapter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B4CD19DA-EE08-5225-FB19-1D0DFA4113DD}|Assembly-CSharp.csproj|solutionrelative:assets\\joystickadapter.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -19,6 +27,32 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Ctrl_OnRobot_RG2_Custom.cs",
+              "DocumentMoniker": "D:\\06. Proyectos\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\Ctrl_OnRobot_RG2_Custom.cs",
+              "RelativeDocumentMoniker": "Assets\\Ctrl_OnRobot_RG2_Custom.cs",
+              "ToolTip": "D:\\06. Proyectos\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\Ctrl_OnRobot_RG2_Custom.cs",
+              "RelativeToolTip": "Assets\\Ctrl_OnRobot_RG2_Custom.cs",
+              "ViewState": "AgIAADUAAAAAAAAAAAAQwFMAAABZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-23T23:25:09.865Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "GripperController.cs",
+              "DocumentMoniker": "D:\\06. Proyectos\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\GripperController.cs",
+              "RelativeDocumentMoniker": "Assets\\GripperController.cs",
+              "ToolTip": "D:\\06. Proyectos\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\GripperController.cs",
+              "RelativeToolTip": "Assets\\GripperController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAjAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-23T23:12:56.483Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "JoystickAdapter.cs",
               "DocumentMoniker": "D:\\06. Proyectos\\proyecto_final_RV_brazo-comandado\\Planta_BrazoRob\u00F3tico\\Assets\\JoystickAdapter.cs",
               "RelativeDocumentMoniker": "Assets\\JoystickAdapter.cs",
