@@ -7,8 +7,8 @@ Planta_BrazoRobótico/[Ll]ogs/
 Planta_BrazoRobótico/[Mm]emoryCaptures/
 Planta_BrazoRobótico/UserSettings/
 Planta_BrazoRobótico/sysinfo.txt
-Planta_BrazoRobótico/.vs
-# === Visual Studio / Rider ===
+Planta_BrazoRobótico/.vs/
+# === Visual Studio ===
 .vscode/
 .idea/
 *.csproj
