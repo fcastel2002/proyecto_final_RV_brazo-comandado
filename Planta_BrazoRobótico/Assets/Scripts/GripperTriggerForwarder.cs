@@ -23,19 +23,19 @@ public class GripperTriggerForwarder : MonoBehaviour
 
 	private void OnTriggerEnter(Collider other)
 	{
-		if (debug) Debug.Log($"[GripperTriggerForwarder] OnTriggerEnter ({gameObject.name}) with {other.name}");
+		if (other.CompareTag("Agarrable"))
+		{
+			gripperController?.NotifyFingerContact(other.gameObject, true);
+			if (debug) Debug.Log($"[GripperTriggerForwarder] OnTriggerEnter ({gameObject.name}) with {other.name}");
+		}
 		// Optionally forward enter
 	}
-
-	private void OnTriggerStay(Collider other)
-	{
-		if (debug) Debug.Log($"[GripperTriggerForwarder] OnTriggerStay ({gameObject.name}) with {other.name}");
-		gripperController?.NotifyTriggerStay(other);
-	}
-
 	private void OnTriggerExit(Collider other)
 	{
 		if (debug) Debug.Log($"[GripperTriggerForwarder] OnTriggerExit ({gameObject.name}) with {other.name}");
-		// Optionally forward exit
+		if(other.CompareTag("Agarrable"))
+		{
+			gripperController?.NotifyFingerContact(other.gameObject, false);
+		}
 	}
 }

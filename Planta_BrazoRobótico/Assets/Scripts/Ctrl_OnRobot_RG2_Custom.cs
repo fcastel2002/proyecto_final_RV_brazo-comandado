@@ -31,13 +31,18 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 	private GameObject R_Arm_ID_2;
 	private GameObject L_Arm_ID_0; private GameObject L_Arm_ID_1;
 	private GameObject L_Arm_ID_2;
+
+	// Rigidbodies for physics-based movement
+	private Rigidbody rb_R_Arm_ID_0; private Rigidbody rb_R_Arm_ID_1; private Rigidbody rb_R_Arm_ID_2;
+	private Rigidbody rb_L_Arm_ID_0; private Rigidbody rb_L_Arm_ID_1; private Rigidbody rb_L_Arm_ID_2;
+
 	//  Others.
-	private int ctrl_state;
+	public int ctrl_state;
 	//  Tracks whether the gripper is currently open.
 	private bool _isOpen = false;
 
 	// Public variables.
-	public bool start_movemet;
+	public bool start_movement;
 	//  Input motion parameters.
 	public float speed;
 	public float stroke;
@@ -87,7 +92,7 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 		// Drive the existing stroke/speed logic.
 		stroke = _isOpen ? s_max : s_min;
 		speed = v_max;
-		start_movemet = true;
+		start_movement = true;
 
 		// Notify the grab/release controller if assigned.
 		if (_gripperController != null)
@@ -109,6 +114,13 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 		L_Arm_ID_0 = transform.Find("L_Arm_ID_0").gameObject; L_Arm_ID_1 = transform.Find("L_Arm_ID_1").gameObject;
 		L_Arm_ID_2 = L_Arm_ID_0.transform.Find("L_Arm_ID_2").gameObject;
 
+		// Get Rigidbodies
+		rb_R_Arm_ID_0 = R_Arm_ID_0.GetComponent<Rigidbody>();
+		rb_R_Arm_ID_1 = R_Arm_ID_1.GetComponent<Rigidbody>();
+		rb_R_Arm_ID_2 = R_Arm_ID_2.GetComponent<Rigidbody>();
+		rb_L_Arm_ID_0 = L_Arm_ID_0.GetComponent<Rigidbody>();
+		rb_L_Arm_ID_1 = L_Arm_ID_1.GetComponent<Rigidbody>();
+		rb_L_Arm_ID_2 = L_Arm_ID_2.GetComponent<Rigidbody>();
 
 		// Reset variables.
 		ctrl_state = 0;
@@ -127,7 +139,7 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 					__stroke = Mathf.Clamp(stroke, s_min, s_max);
 					__speed = Mathf.Clamp(speed, v_min, v_max);
 
-					if (start_movemet == true)
+					if (start_movement == true)
 					{
 						ctrl_state = 1;
 					}
@@ -152,18 +164,37 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 					__theta_i = Mathf.MoveTowards(__theta_i, __theta, __speed * Time.deltaTime);
 
 					// Change the orientation of the end-effector arm.
+					Quaternion rotR0 = Quaternion.Euler(0.0f, -__theta_i, 0.0f);
+					Quaternion rotR1 = Quaternion.Euler(0.0f, -__theta_i, 0.0f);
+					Quaternion rotR2 = Quaternion.Euler(0.0f, __theta_i, 0.0f);
+
+					Quaternion rotL0 = Quaternion.Euler(0.0f, __theta_i, 0.0f);
+					Quaternion rotL1 = Quaternion.Euler(0.0f, __theta_i, 0.0f);
+					Quaternion rotL2 = Quaternion.Euler(0.0f, -__theta_i, 0.0f);
+
 					//  Right arm.
-					R_Arm_ID_0.transform.localEulerAngles = new Vector3(0.0f, -__theta_i, 0.0f);
-					R_Arm_ID_1.transform.localEulerAngles = new Vector3(0.0f, -__theta_i, 0.0f);
-					R_Arm_ID_2.transform.localEulerAngles = new Vector3(0.0f, __theta_i, 0.0f);
+					if (rb_R_Arm_ID_0 != null) rb_R_Arm_ID_0.MoveRotation(R_Arm_ID_0.transform.parent.rotation * rotR0);
+					else R_Arm_ID_0.transform.localRotation = rotR0;
+
+					if (rb_R_Arm_ID_1 != null) rb_R_Arm_ID_1.MoveRotation(R_Arm_ID_1.transform.parent.rotation * rotR1);
+					else R_Arm_ID_1.transform.localRotation = rotR1;
+
+					if (rb_R_Arm_ID_2 != null) rb_R_Arm_ID_2.MoveRotation(R_Arm_ID_2.transform.parent.rotation * rotR2);
+					else R_Arm_ID_2.transform.localRotation = rotR2;
+
 					//  Left arm.
-					L_Arm_ID_0.transform.localEulerAngles = new Vector3(0.0f, __theta_i, 0.0f);
-					L_Arm_ID_1.transform.localEulerAngles = new Vector3(0.0f, __theta_i, 0.0f);
-					L_Arm_ID_2.transform.localEulerAngles = new Vector3(0.0f, -__theta_i, 0.0f);
+					if (rb_L_Arm_ID_0 != null) rb_L_Arm_ID_0.MoveRotation(L_Arm_ID_0.transform.parent.rotation * rotL0);
+					else L_Arm_ID_0.transform.localRotation = rotL0;
+
+					if (rb_L_Arm_ID_1 != null) rb_L_Arm_ID_1.MoveRotation(L_Arm_ID_1.transform.parent.rotation * rotL1);
+					else L_Arm_ID_1.transform.localRotation = rotL1;
+
+					if (rb_L_Arm_ID_2 != null) rb_L_Arm_ID_2.MoveRotation(L_Arm_ID_2.transform.parent.rotation * rotL2);
+					else L_Arm_ID_2.transform.localRotation = rotL2;
 
 					if (__theta_i == __theta)
 					{
-						in_position = true; start_movemet = false;
+						in_position = true; start_movement = false;
 						ctrl_state = 0;
 					}
 				}
