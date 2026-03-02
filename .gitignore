@@ -42,3 +42,7 @@ $RECYCLE.BIN/
 # === Crash Reports ===
 *.stacktrace
 *.crash
+# === PlatformIO ===
+.pio/
+.platformio/
+*.pioenvs/
