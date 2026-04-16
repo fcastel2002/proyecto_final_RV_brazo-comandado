@@ -6,6 +6,8 @@ Planta_BrazoRobótico/[Bb]uild*/
 Planta_BrazoRobótico/[Ll]ogs/
 Planta_BrazoRobótico/[Mm]emoryCaptures/
 Planta_BrazoRobótico/UserSettings/
+Planta_BrazoRobótico/ProjectSettings/
+Planta_BrazoRobótico/Packages/
 Planta_BrazoRobótico/sysinfo.txt
 Planta_BrazoRobótico/.vs/
 # === Visual Studio ===
@@ -23,6 +25,7 @@ Planta_BrazoRobótico/.vs/
 *.svd
 *.pdb
 *.mdb
+.vs/
 
 # === OS Specific ===
 .DS_Store
@@ -46,3 +49,6 @@ $RECYCLE.BIN/
 .pio/
 .platformio/
 *.pioenvs/
+/Planta_BrazoRobótico/ProjectSettings
+/Planta_BrazoRobótico/ProjectSettings
+/Planta_BrazoRobótico/Packages
