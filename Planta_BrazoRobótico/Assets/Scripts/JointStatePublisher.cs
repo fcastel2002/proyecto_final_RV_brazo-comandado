@@ -94,7 +94,7 @@ public class JointStatePublisher : MonoBehaviour
             {
                 stamp = new RosMessageTypes.BuiltinInterfaces.TimeMsg
                 {
-                    sec  = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    sec  = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     nanosec = (uint)((DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 1000) * 1_000_000)
                 },
                 frame_id = "base_link"
