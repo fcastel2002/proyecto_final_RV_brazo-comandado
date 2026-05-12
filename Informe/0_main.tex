@@ -1,0 +1,28 @@
+\documentclass[12pt]{article}
+\usepackage{EngReport}
+\graphicspath{{images/}}
+\bibliography{Sources}
+\onehalfspacing
+\geometry{letterpaper, portrait, includeheadfoot=true, hmargin=1in, vmargin=1in}
+
+\begin{document}
+\renewcommand{\familydefault}{\rmdefault}
+
+\input{titlepage}
+\input{headerfooter}
+
+\tableofcontents
+\pagebreak
+
+% Sección 1: Introducción y Motivación
+\input{1_introduccion}
+
+% Sección 2: Objetivos y Alcance
+\input{2_objetivos_alcance}
+
+% Sección 3: Metodología y Tecnologías
+\input{3_metodologia}
+
+
+\printbibliography
+\end{document}

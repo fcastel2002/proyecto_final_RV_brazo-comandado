@@ -34,6 +34,11 @@ public class JoystickAdapter : MonoBehaviour
     [Tooltip("Max linear speed (m/s)")]
     [SerializeField] private float _speed = 0.1f;
 
+    [Header("PID — Base gains (tunear en Inspector)")]
+    [SerializeField] private float _kpBase = 5f;
+    [SerializeField] private float _kiBase = 0.5f;
+    [SerializeField] private float _kdBase = 0.1f;
+
     // ─── Estado público ───────────────────────────────────────────────────────
 
     /// <summary>true = modo cámara activo, false = modo robot activo.</summary>
@@ -55,6 +60,7 @@ public class JoystickAdapter : MonoBehaviour
     private float _signX = 1f;
 
     private Vector3 _velocity;
+    private JointPID[] _pids;
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -89,6 +95,7 @@ public class JoystickAdapter : MonoBehaviour
         // Inicializar el remapeo con la orientación actual del efector
         if (_endEffector != null)
             InitDefaultMapping();
+        InitPIDs();
     }
 
     // ─── Toggle L3 ───────────────────────────────────────────────────────────
@@ -98,9 +105,12 @@ public class JoystickAdapter : MonoBehaviour
         bool wasCameraMode = IsCameraMode;
         IsCameraMode = !IsCameraMode;
 
-        // Al VOLVER al modo robot → recalcular mapeo desde posición actual de cámara
+        // Al VOLVER al modo robot → recalcular mapeo y limpiar integradores PID
         if (wasCameraMode && !IsCameraMode)
+        {
             RemapAxesFromCamera();
+            ResetPIDs();
+        }
 
         Debug.Log($"[JoystickAdapter] Modo: {(IsCameraMode ? "CAMARA" : "ROBOT")} | " +
                   $"dirZ={_dirZ * _signZ} | dirX={_dirX * _signX}");
@@ -147,7 +157,40 @@ public class JoystickAdapter : MonoBehaviour
 
         if (!solution.IsValid) return;
 
-        _controller.MechanicalGroup.SetJoints(solution.JointTarget, notify: true);
+        ApplyPID(solution.JointTarget, Time.fixedDeltaTime);
+    }
+
+    // ─── PID ─────────────────────────────────────────────────────────────────
+
+    private void InitPIDs()
+    {
+        _pids = new JointPID[6];
+        for (int i = 0; i < 6; i++)
+            _pids[i] = new JointPID(_kpBase, _kiBase, _kdBase);
+    }
+
+    private void ResetPIDs()
+    {
+        if (_pids == null) return;
+        foreach (var pid in _pids)
+            pid.Reset();
+    }
+
+    private void ApplyPID(JointTarget ikTarget, float dt)
+    {
+        var robotJoints = _controller.MechanicalGroup.RobotJoints;
+        float[] jEff = RobotDynamics.ComputeEffectiveInertia(robotJoints);
+
+        var qNew = new float[6];
+        for (int i = 0; i < 6; i++)
+        {
+            float qTarget = ikTarget[i];
+            float qActual = _controller.MechanicalGroup.JointState[i];
+            _pids[i].Ki = _kiBase / Mathf.Max(jEff[i], 0.01f);
+            qNew[i] = qActual + _pids[i].Compute(qTarget, qActual, dt);
+        }
+
+        _controller.MechanicalGroup.SetJoints(new JointTarget(qNew), notify: true);
     }
 
     // ─── Remapeo de ejes ─────────────────────────────────────────────────────

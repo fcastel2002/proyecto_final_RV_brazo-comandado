@@ -1,0 +1,123 @@
+\graphicspath{{Images/}}
+
+\section{Resumen}
+Este anteproyecto propone el desarrollo de un \textbf{entorno virtual (VR)} para \textbf{entrenar a operarios} en el uso de un \textbf{brazo robótico} y la posterior \textbf{teleoperación} con un joystick diseñado ad hoc sobre \textit{Raspberry Pi Pico}. El sistema combina simulación en \textit{Unity}, medición de desempeño y un pipeline que facilite la transferencia desde el entrenamiento en VR al control del robot real.
+
+\section{Motivación y justificación}
+La teleoperación es pertinente cuando existen \textit{riesgos ambientales}, se requiere \textit{precisión manual}, hay \textit{alta variabilidad} en la tarea o se busca \textit{transferir expertise} humana. La VR reduce costos y riesgos de entrenamiento, habilita \textit{iteración rápida} y define métricas objetivas (tiempo, trayectorias, colisiones, suavidad del movimiento).
+
+\section{Objetivos}
+\subsection{Objetivo general}
+Desarrollar un entorno VR y un esquema de control que permitan entrenar y luego teleoperar un brazo robótico mediante un joystick propio, priorizando seguridad, usabilidad y desempeño.
+
+\subsection{Objetivos específicos}
+\begin{enumerate}
+  \item Implementar un \textbf{simulador} de brazo robótico en Unity con interacción XR.
+  \item Diseñar el \textbf{mapeo de controles} del joystick (RPi Pico) a los grados de libertad del robot.
+  \item Instrumentar \textbf{métricas de entrenamiento}: tiempo, errores, colisiones, suavidad/jerk.
+  \item Diseñar y validar \textbf{modos de teleoperación}: velocidad limitada, asistencia, seguimiento de path.
+  \item Incorporar \textbf{mecanismos de seguridad}: e-stop, zonas prohibidas, límites de torque/velocidad.
+  \item Realizar una \textbf{evaluación} con usuarios: usabilidad (SUS), aprendizaje y transferencia a robot real/simulador de mayor fidelidad.
+\end{enumerate}
+
+\section{Alcance y exclusiones}
+\subsection*{Alcance}
+\begin{itemize}
+  \item Entrenamiento VR de tareas representativas (p.ej., pick\&place, posicionamiento preciso).
+  \item Teleoperación con joystick RPi Pico (prototipo funcional).
+  \item Integración de comunicación (serial/UDP/TCP) y capa de seguridad básica.
+\end{itemize}
+\subsection*{Fuera de alcance (por ahora)}
+\begin{itemize}
+  \item Retroalimentación háptica avanzada.
+  \item \textit{Motion planning} autónomo o visión por computadora compleja.
+  \item Certificación normativa industrial.
+\end{itemize}
+
+\section{Requisitos}
+\subsection{Funcionales}
+\begin{itemize}
+  \item Control en tiempo real del robot (simulado) desde el joystick.
+  \item Escenarios VR con objetivos, \textit{checkpoints} y feedback.
+  \item Registro de métricas y generación de reportes.
+  \item Modo teleoperado con límites de seguridad (e-stop, zonas).
+\end{itemize}
+\subsection{No funcionales}
+\begin{itemize}
+  \item \textbf{Latencia} end-to-end $< 60$--$100$\,ms (objetivo inicial).
+  \item \textbf{Usabilidad}: SUS $\geq 70$.
+  \item \textbf{Compatibilidad}: Windows y \textit{headset} VR objetivo.
+  \item \textbf{Mantenibilidad}: arquitectura modular y documentación.
+\end{itemize}
+
+\section{Estado del arte (breve)}
+Se revisarán enfoques de simulación de robots en motores 3D, bibliotecas XR, estándares de seguridad en teleoperación y soluciones de \textit{joysticks} personalizados. 
+
+\section{Metodología y tecnologías}
+\subsection{Motor gráfico y XR}
+Unity (render pipeline apropiado) y sistema de \textit{input}. 
+\subsection{Arquitectura}
+\begin{itemize}
+  \item \textbf{Capa de Dispositivos}: joystick RPi Pico $\rightarrow$ PC (USB/serial/UDP).
+  \item \textbf{Capa de Control}: mapeo joystick $\rightarrow$ comandos (velocidad/posición).
+  \item \textbf{Capa de Simulación}: cinemática/dinámica y colisiones.
+  \item \textbf{Capa de VR/UX}: escenas, HUD, feedback, tutoriales.
+  \item \textbf{Teleoperación}: canal de comunicación + \textit{safety layer}.
+\end{itemize}
+
+\subsection{Hardware de interfaz: Joystick RPi Pico}
+\begin{itemize}
+  \item \textbf{Estado actual}: primer prototipo impreso 3D y firmware básico (PWM/ADC/USB HID o serial).
+  \item \textbf{Plan}: iteraciones de ergonomía, \textit{deadband}, \textit{debounce}, vibración opcional.
+\end{itemize}
+\begin{figure}[H]
+\centering
+\includegraphics[angle=90,width=0.7\textwidth]{Imagenes/joystick_top_inside.png}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[angle=90,width=0.7\textwidth]{Imagenes/joystick_top_full.png}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Imagenes/gamepad_tester.png}
+    \caption{Se utilizó la librería TinyUSB para implementar el protocolo HID}
+    
+\end{figure}
+\end{figure}
+
+
+\subsection{Simulación del robot}
+Cinemática directa/inversa, límites articulares, velocidad y \textit{soft stops}. Opcional: exportar URDF y/o puente ROS2 para escalabilidad futura.
+
+\subsection{Teleoperación y seguridad}
+Modos de control (velocity/position), \textit{rate limiting}, filtros, geofencing, e-stop físico/virtual, \textit{watchdog} de conexión.
+
+\section{Plan de evaluación}
+\subsection{Métricas}
+Tiempo por tarea, tasa de errores/colisiones, suavidad (jerk promedio), \#\ de reintentos, aprendizaje (\textit{pre/post}), SUS.
+\subsection{Diseño experimental}
+$N \approx 8$--$12$ participantes (piloto), ensayo de 2–3 tareas con y sin asistencia, análisis de normalidad y comparaciones (p.ej., Wilcoxon/ttest).
+
+
+
+\section{Entregables}
+\begin{itemize}
+  \item Demo VR funcional (entrenamiento).
+  \item Prototipo de joystick RPi Pico (STL/FW).
+  \item Módulo de teleoperación con \textit{safety layer}.
+  \item Informe con resultados y repositorio con código/documentación.
+\end{itemize}
+
+\section{Riesgos y mitigaciones}
+\begin{itemize}
+  \item Latencia alta $\rightarrow$ \textit{rate limiting}, compresión, simplificación de escena.
+  \item Inestabilidad de control $\rightarrow$ saturaciones, \textit{low-pass}, límites articulares.
+  \item Fatiga del usuario $\rightarrow$ sesiones cortas, ergonomía del joystick, tutoriales progresivos.
+\end{itemize}
+
+\section{Consideraciones éticas y de seguridad}
+Privacidad de datos de uso, seguridad funcional (e-stop), ergonomía y prevención de mareo en VR (pausas, locomoción adecuada).
+
+\section{Plan de bibliografía}
+Se incluirán trabajos de teleoperación, entrenamiento en VR, cinemática de robots y guías de HMI/seguridad. 
+

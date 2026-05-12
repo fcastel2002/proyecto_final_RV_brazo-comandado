@@ -1,0 +1,68 @@
+% ============================================================
+%  SECCIÓN 3 – Metodología y Tecnologías
+% ============================================================
+
+\section{Metodología y Tecnologías}
+
+\subsection{Motor gráfico y entorno XR}
+
+El proyecto utiliza \textbf{Unity 6.3 LTS} como motor gráfico principal. Unity provee soporte nativo para \textit{Extended Reality} (XR) a través del paquete \textit{XR Interaction Toolkit}, así como un sistema de \textit{input} flexible (Unity Input System) que permite integrar dispositivos HID personalizados como el joystick RPi Pico. Se emplea el pipeline de renderizado Universal Render Pipeline (URP), compatible con los principales \textit{headsets} de VR del mercado y optimizado para rendimiento en tiempo real.
+
+\subsection{Arquitectura del sistema}
+
+El sistema se organiza en capas funcionales que delimitan las responsabilidades de cada componente:
+
+\begin{itemize}
+    \item \textbf{Capa de Dispositivos}: el joystick RPi Pico se conecta al PC mediante USB, exponiendo sus ejes analógicos y botones como dispositivo HID estándar (protocolo implementado con la librería TinyUSB).
+    \item \textbf{Capa de Control}: módulo en Unity responsable del mapeo de los ejes del joystick a comandos de velocidad o posición para los grados de libertad del robot.
+    \item \textbf{Capa de Simulación}: modelo cinemático del brazo robótico, físicas de colisión y restricciones articulares dentro del entorno Unity.
+    \item \textbf{Capa de VR/UX}: escenas de entrenamiento, HUD de retroalimentación, objetivos interactivos y tutoriales progresivos.
+    \item \textbf{Capa de Teleoperación}: canal de comunicación serie/UDP y \textit{safety layer} para la eventual conexión con el robot real.
+\end{itemize}
+
+\subsection{Hardware de interfaz: Joystick RPi Pico}
+
+El hardware de control fue diseñado e implementado íntegramente por Francisco Castel como componente específico del proyecto.
+
+\subsubsection*{Diseño y prototipado}
+
+Se diseñó un controlador de dos ejes analógicos con carcasa ergonómica impresa en 3D. El joystick utiliza un microcontrolador \textbf{Raspberry Pi Pico} como unidad central, aprovechando sus conversores analógico-digitales (ADC) para la lectura de los potenciómetros de cada eje y sus capacidades USB para la comunicación con el host.
+
+\subsubsection*{Firmware y protocolo de comunicación}
+
+El firmware fue desarrollado en C/C++ sobre el SDK de RPi Pico. Para la capa de comunicación se implementó el protocolo \textbf{USB HID} utilizando la librería \textit{TinyUSB}, lo que permite que el joystick sea reconocido automáticamente por el sistema operativo como un gamepad estándar, sin necesidad de drivers adicionales. Esto simplifica significativamente la integración con Unity a través de su Input System.
+
+El funcionamiento correcto del protocolo HID fue verificado con la herramienta \textit{Gamepad Tester}, que confirmó la correcta lectura de los ejes analógicos y la identificación del dispositivo como \texttt{cafe-4004-Joystick VR}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[angle=90, width=0.65\textwidth]{Imagenes/joystick_top_inside.png}
+    \caption{Interior del joystick: RPi Pico montado sobre placa de prototipado con los módulos analógicos de cada eje.}
+    \label{fig:joystick_inside}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[angle=90, width=0.65\textwidth]{Imagenes/joystick_top_full.png}
+    \caption{Vista exterior del prototipo con carcasa impresa en 3D y ejes de control montados.}
+    \label{fig:joystick_full}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{Imagenes/gamepad_tester.png}
+    \caption{Verificación del dispositivo HID en \textit{Gamepad Tester}: lectura en tiempo real de los ejes analógicos del joystick RPi Pico.}
+    \label{fig:gamepad_tester}
+\end{figure}
+
+\subsubsection*{Estado actual y próximos pasos}
+
+El primer prototipo funcional está operativo, con firmware básico de lectura ADC y comunicación USB HID. Las iteraciones planificadas incluyen ajuste de zona muerta (\textit{deadband}), filtrado de ruido (\textit{debounce}), refinamiento ergonómico de la carcasa y evaluación de vibración háptica opcional.
+
+\subsection{Simulación del robot en Unity}
+
+La simulación del brazo robótico electrohidráulico se implementa dentro de Unity utilizando el paquete de robótica \textbf{Flange}, que provee modelos 3D articulados y una interfaz de control integrada en el Inspector de Unity. Este paquete expone un panel de control con sliders por cada articulación (J1--J6), posicionamiento cartesiano y funciones de guardado de pose.
+
+La física de las articulaciones se gestiona mediante componentes \texttt{HingeJoint} y \texttt{Rigidbody} de Unity, que permiten simular las restricciones mecánicas del manipulador real. Los grados de libertad del robot son controlados mediante scripts C\# que reciben comandos de velocidad desde la capa de control del joystick.
+
+Los detalles del desarrollo de la simulación ---incluyendo los scripts implementados, la arquitectura de control y el modo cámara--- se describen en profundidad en la sección siguiente.
