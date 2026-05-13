@@ -1,30 +1,29 @@
-﻿using UnityEngine;
-using UnityEngine.InputSystem;
 using Preliy.Flange;
+using TMPro;
+using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// Mueve el efector final del robot en coordenadas cartesianas con el joystick.
-/// Presionar L3 alterna entre modo Robot y modo Cámara.
+/// Presionar L3 alterna entre modo Robot y modo Camara.
 ///
-/// Al volver del modo Cámara al modo Robot se recalcula automáticamente cuál
+/// Al volver del modo Camara al modo Robot se recalcula automaticamente cual
 /// eje local del efector final (right / forward) debe responder a cada palanca,
-/// de modo que MoveZ siempre empuje "hacia el robot desde donde estás parado"
+/// de modo que MoveZ siempre empuje "hacia el robot desde donde estas parado"
 /// y MoveX se desplace en perpendicular.
 /// </summary>
 public class JoystickAdapter : MonoBehaviour
 {
-    // ─── Inspector ────────────────────────────────────────────────────────────
-
     [Header("Controller")]
     [SerializeField] private Controller _controller;
 
-    [Header("Input Actions — Robot")]
-    [SerializeField] private InputActionReference _moveX;   // left stick L/R  → lado
-    [SerializeField] private InputActionReference _moveY;   // right stick U/D  → altura
-    [SerializeField] private InputActionReference _moveZ;   // left stick U/D   → avance
+    [Header("Input Actions - Robot")]
+    [SerializeField] private InputActionReference _moveX;
+    [SerializeField] private InputActionReference _moveY;
+    [SerializeField] private InputActionReference _moveZ;
 
     [Header("Mode Toggle")]
-    [SerializeField] private InputActionReference _modoCamara;  // L3
+    [SerializeField] private InputActionReference _modoCamara;
 
     [Header("Efector final (para el remapeo de ejes)")]
     [Tooltip("Asignar el transform del Joint_6 / Flange")]
@@ -34,25 +33,18 @@ public class JoystickAdapter : MonoBehaviour
     [Tooltip("Max linear speed (m/s)")]
     [SerializeField] private float _speed = 0.1f;
 
-    [Header("PID — Base gains (tunear en Inspector)")]
+    [Header("UI - Accion de control por articulacion")]
+    [Tooltip("Textos TMP del panel para mostrar la accion de control de J1 a J6.")]
+    [SerializeField] private TextMeshProUGUI[] _jointActionTexts = new TextMeshProUGUI[6];
+    [SerializeField] private string _jointActionFormat = "F3";
+
+    [Header("PID - Base gains (tunear en Inspector)")]
     [SerializeField] private float _kpBase = 5f;
     [SerializeField] private float _kiBase = 0.5f;
     [SerializeField] private float _kdBase = 0.1f;
 
-    // ─── Estado público ───────────────────────────────────────────────────────
-
-    /// <summary>true = modo cámara activo, false = modo robot activo.</summary>
-    public static bool IsCameraMode { get; private set; } = false;
-
-    // ─── Remapeo dinámico de ejes ─────────────────────────────────────────────
-    //
-    //  _dirZ  → dirección mundo (XZ plano, Y=0, normalizado) que recibe MoveZ
-    //  _signZ → +1 ó -1 para MoveZ
-    //  _dirX  → dirección mundo (XZ plano, Y=0, normalizado) que recibe MoveX
-    //  _signX → +1 ó -1 para MoveX
-    //
-    //  Por defecto: forward del efector → Z, right del efector → X, ambos +1.
-    // ─────────────────────────────────────────────────────────────────────────
+    /// <summary>true = modo camara activo, false = modo robot activo.</summary>
+    public static bool IsCameraMode { get; private set; }
 
     private Vector3 _dirZ = Vector3.forward;
     private Vector3 _dirX = Vector3.right;
@@ -61,8 +53,9 @@ public class JoystickAdapter : MonoBehaviour
 
     private Vector3 _velocity;
     private JointPID[] _pids;
+    private readonly float[] _lastJointControlActions = new float[6];
 
-    // ─── Lifecycle ────────────────────────────────────────────────────────────
+    public float[] LastJointControlActions => _lastJointControlActions;
 
     private void OnEnable()
     {
@@ -92,37 +85,33 @@ public class JoystickAdapter : MonoBehaviour
 
     private void Start()
     {
-        // Inicializar el remapeo con la orientación actual del efector
         if (_endEffector != null)
             InitDefaultMapping();
-        InitPIDs();
-    }
 
-    // ─── Toggle L3 ───────────────────────────────────────────────────────────
+        InitPIDs();
+        ClearJointActionDisplay();
+    }
 
     private void OnModoCamaraToggle(InputAction.CallbackContext ctx)
     {
         bool wasCameraMode = IsCameraMode;
         IsCameraMode = !IsCameraMode;
 
-        // Al VOLVER al modo robot → recalcular mapeo y limpiar integradores PID
         if (wasCameraMode && !IsCameraMode)
         {
             RemapAxesFromCamera();
             ResetPIDs();
         }
 
-        Debug.Log($"[JoystickAdapter] Modo: {(IsCameraMode ? "CAMARA" : "ROBOT")} | " +
-                  $"dirZ={_dirZ * _signZ} | dirX={_dirX * _signX}");
+        Debug.Log($"[JoystickAdapter] Modo: {(IsCameraMode ? "CAMARA" : "ROBOT")} | dirZ={_dirZ * _signZ} | dirX={_dirX * _signX}");
     }
-
-    // ─── Update / FixedUpdate ─────────────────────────────────────────────────
 
     private void Update()
     {
         if (IsCameraMode)
         {
             _velocity = Vector3.zero;
+            ClearJointActionDisplay();
             return;
         }
 
@@ -130,7 +119,6 @@ public class JoystickAdapter : MonoBehaviour
         float rawY = _moveY?.action.ReadValue<float>() ?? 0f;
         float rawZ = _moveZ?.action.ReadValue<float>() ?? 0f;
 
-        // Construir el vector de velocidad en espacio mundo usando el remapeo
         _velocity = _dirX * (rawX * _signX)
                   + Vector3.up * rawY
                   + _dirZ * (rawZ * _signZ);
@@ -140,7 +128,12 @@ public class JoystickAdapter : MonoBehaviour
     {
         if (IsCameraMode) return;
         if (_controller == null || !_controller.IsValid.Value) return;
-        if (_velocity.sqrMagnitude < 1e-6f) return;
+
+        if (_velocity.sqrMagnitude < 1e-6f)
+        {
+            ClearJointActionDisplay();
+            return;
+        }
 
         var delta = _velocity * (_speed * Time.fixedDeltaTime);
         var currentPose = _controller.PoseObserver.ToolCenterPointFrame.Value;
@@ -155,12 +148,14 @@ public class JoystickAdapter : MonoBehaviour
         var target = new CartesianTarget(targetPose, configuration, extJoint);
         var solution = _controller.Solver.ComputeInverse(target, tool, frame);
 
-        if (!solution.IsValid) return;
+        if (!solution.IsValid)
+        {
+            ClearJointActionDisplay();
+            return;
+        }
 
         ApplyPID(solution.JointTarget, Time.fixedDeltaTime);
     }
-
-    // ─── PID ─────────────────────────────────────────────────────────────────
 
     private void InitPIDs()
     {
@@ -172,8 +167,11 @@ public class JoystickAdapter : MonoBehaviour
     private void ResetPIDs()
     {
         if (_pids == null) return;
+
         foreach (var pid in _pids)
             pid.Reset();
+
+        ClearJointActionDisplay();
     }
 
     private void ApplyPID(JointTarget ikTarget, float dt)
@@ -187,18 +185,36 @@ public class JoystickAdapter : MonoBehaviour
             float qTarget = ikTarget[i];
             float qActual = _controller.MechanicalGroup.JointState[i];
             _pids[i].Ki = _kiBase / Mathf.Max(jEff[i], 0.01f);
-            qNew[i] = qActual + _pids[i].Compute(qTarget, qActual, dt);
+
+            float controlAction = _pids[i].Compute(qTarget, qActual, dt);
+            _lastJointControlActions[i] = controlAction;
+            qNew[i] = qActual + controlAction;
         }
 
+        UpdateJointActionDisplay();
         _controller.MechanicalGroup.SetJoints(new JointTarget(qNew), notify: true);
     }
 
-    // ─── Remapeo de ejes ─────────────────────────────────────────────────────
+    private void UpdateJointActionDisplay()
+    {
+        if (_jointActionTexts == null) return;
 
-    /// <summary>
-    /// Inicialización por defecto: forward del efector → MoveZ,
-    /// right del efector → MoveX, sin inversión.
-    /// </summary>
+        int count = Mathf.Min(_jointActionTexts.Length, _lastJointControlActions.Length);
+        for (int i = 0; i < count; i++)
+        {
+            if (_jointActionTexts[i] == null) continue;
+            _jointActionTexts[i].text = _lastJointControlActions[i].ToString(_jointActionFormat);
+        }
+    }
+
+    private void ClearJointActionDisplay()
+    {
+        for (int i = 0; i < _lastJointControlActions.Length; i++)
+            _lastJointControlActions[i] = 0f;
+
+        UpdateJointActionDisplay();
+    }
+
     private void InitDefaultMapping()
     {
         Vector3 fwd = _endEffector.forward;
@@ -213,11 +229,6 @@ public class JoystickAdapter : MonoBehaviour
         _signX = 1f;
     }
 
-    /// <summary>
-    /// Recalcula qué eje local del efector (right/forward, proyectados en XZ)
-    /// se asigna a MoveZ y MoveX en función de la posición actual de la cámara,
-    /// siguiendo el algoritmo geométrico de cinco pasos descrito en el brief.
-    /// </summary>
     private void RemapAxesFromCamera()
     {
         if (_endEffector == null)
@@ -233,74 +244,54 @@ public class JoystickAdapter : MonoBehaviour
             return;
         }
 
-        // ── Paso 1: Vector C (efector − cámara), proyectado en XZ ────────────
-        Vector3 C = _endEffector.position - cam.transform.position;
-        C.y = 0f;
-        if (C.sqrMagnitude < 1e-6f)
+        Vector3 c = _endEffector.position - cam.transform.position;
+        c.y = 0f;
+        if (c.sqrMagnitude < 1e-6f)
         {
-            Debug.LogWarning("[JoystickAdapter] Cámara sobre el efector; se mantiene el mapeo actual.");
+            Debug.LogWarning("[JoystickAdapter] Camara sobre el efector; se mantiene el mapeo actual.");
             return;
         }
-        C = C.normalized;
+        c = c.normalized;
 
-        // ── Paso 2: Ejes locales proyectados en XZ ───────────────────────────
-        Vector3 localFwd = _endEffector.forward; localFwd.y = 0f;
-        Vector3 localRgt = _endEffector.right; localRgt.y = 0f;
+        Vector3 localFwd = _endEffector.forward;
+        localFwd.y = 0f;
+        Vector3 localRgt = _endEffector.right;
+        localRgt.y = 0f;
 
-        // Evitar vectores nulos (si el efector apunta exactamente hacia arriba/abajo)
         if (localFwd.sqrMagnitude < 1e-6f) localFwd = Vector3.forward;
         if (localRgt.sqrMagnitude < 1e-6f) localRgt = Vector3.right;
         localFwd = localFwd.normalized;
         localRgt = localRgt.normalized;
 
-        float rawAngleFwd = Vector3.Angle(C, localFwd);   // 0..180
-        float rawAngleRgt = Vector3.Angle(C, localRgt);   // 0..180
+        float rawAngleFwd = Vector3.Angle(c, localFwd);
+        float rawAngleRgt = Vector3.Angle(c, localRgt);
 
-        // ── Paso 3: Ajustar ángulos al rango [-90, 90] ───────────────────────
-        //   Si el ángulo es > 90°, el vector "apunta en dirección opuesta" a C.
-        //   Restamos 180° para obtener cuánto falta respecto al vector invertido.
         float adjFwd = rawAngleFwd > 90f ? rawAngleFwd - 180f : rawAngleFwd;
         float adjRgt = rawAngleRgt > 90f ? rawAngleRgt - 180f : rawAngleRgt;
 
-        // El ángulo ajustado negativo significa que el eje INVERTIDO es el
-        // que apunta hacia C; su valor absoluto indica qué tan bien se alinea.
+        bool fwdIsZ = Mathf.Abs(adjFwd) <= Mathf.Abs(adjRgt);
 
-        bool fwdIsZ = Mathf.Abs(adjFwd) <= Mathf.Abs(adjRgt);  // fwd → MoveZ?
-
-        // ── Paso 4: Asignar MoveZ ─────────────────────────────────────────────
         Vector3 axisZ;
-        float signZ;
         float rawAngleZ;
         Vector3 axisX;
-        float rawAngleX;
 
         if (fwdIsZ)
         {
             axisZ = localFwd;
             rawAngleZ = rawAngleFwd;
             axisX = localRgt;
-            rawAngleX = rawAngleRgt;
         }
         else
         {
             axisZ = localRgt;
             rawAngleZ = rawAngleRgt;
             axisX = localFwd;
-            rawAngleX = rawAngleFwd;
         }
 
-        // Si el ángulo original era > 90° el eje apunta "al revés" respecto a C
-        // → invertir el sentido positivo de MoveZ
-        signZ = rawAngleZ > 90f ? -1f : 1f;
-
-        // ── Paso 5: Asignar MoveX y determinar su signo ───────────────────────
-        // Producto vectorial: axisX × C  (ambos en XZ → resultado en Y)
-        // Si el Y del resultado es positivo el producto apunta en la dirección
-        // del mundo +Y → no invertir.  Si es negativo → invertir.
-        Vector3 cross = Vector3.Cross(axisX, C);
+        float signZ = rawAngleZ > 90f ? -1f : 1f;
+        Vector3 cross = Vector3.Cross(axisX, c);
         float signX = cross.y >= 0f ? 1f : -1f;
 
-        // ── Guardar resultados ────────────────────────────────────────────────
         _dirZ = axisZ;
         _signZ = signZ;
         _dirX = axisX;
