@@ -1,5 +1,6 @@
 #include "tusb.h"
 #include <string.h>
+#include "vibration_motor.h"
 
 #define VENDOR_ID 0xCAFE
 #define PRODUCT_ID 0x4004
@@ -15,7 +16,22 @@
 #define CONFIG_POWER_MA 100
 
 static const uint8_t hid_report_descriptor[] = {
-    TUD_HID_REPORT_DESC_GAMEPAD()
+    TUD_HID_REPORT_DESC_GAMEPAD(),
+
+    HID_USAGE_PAGE_N(0xFF00, 2),
+    HID_USAGE(0x01),
+    HID_COLLECTION(HID_COLLECTION_APPLICATION),
+        HID_USAGE(0x01),
+        HID_LOGICAL_MIN(0),
+        HID_LOGICAL_MAX(1),
+        HID_REPORT_SIZE(1),
+        HID_REPORT_COUNT(1),
+        HID_OUTPUT(HID_DATA | HID_VARIABLE | HID_ABSOLUTE),
+
+        HID_REPORT_SIZE(7),
+        HID_REPORT_COUNT(1),
+        HID_OUTPUT(HID_CONSTANT),
+    HID_COLLECTION_END
 };
 
 static const tusb_desc_device_t device_descriptor = {
@@ -108,7 +124,10 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
                            uint8_t const* buffer, uint16_t bufsize) {
     (void)instance;
     (void)report_id;
-    (void)report_type;
-    (void)buffer;
-    (void)bufsize;
+
+    if (report_type != HID_REPORT_TYPE_OUTPUT || buffer == NULL || bufsize < 1) {
+        return;
+    }
+
+    vibration_motor_set((buffer[0] & VIBRATION_REPORT_ON_MASK) != 0);
 }

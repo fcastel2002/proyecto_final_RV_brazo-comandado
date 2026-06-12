@@ -41,6 +41,7 @@ add_executable(joystick_v1
 joystick_v1.cpp
 usb_descriptors.c
 joystick_analog.cpp
+vibration_motor.c
 )
 pico_set_program_name(joystick_v1 "joystick_v1")
 pico_set_program_version(joystick_v1 "0.1")
