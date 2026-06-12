@@ -52,3 +52,10 @@ $RECYCLE.BIN/
 /Planta_BrazoRobótico/ProjectSettings
 /Planta_BrazoRobótico/ProjectSettings
 /Planta_BrazoRobótico/Packages
+*.STEP
+*.SLDPRT
+*.3MF
+*.SLDASM
+*.AMF
+*.SLDPRT
+*.SLDASM
