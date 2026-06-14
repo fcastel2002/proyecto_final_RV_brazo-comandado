@@ -3564,6 +3564,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1424931421}
   - component: {fileID: 1424931422}
+  - component: {fileID: 1424931423}
   m_Layer: 0
   m_Name: DistanceSensor
   m_TagString: Untagged
@@ -3614,9 +3615,36 @@ MonoBehaviour:
   safeGripText: Seguro para agarrar
   unsafeGripText: Ajustar posicion
   noDetectionStatusText: Sin objeto detectado
+  joystickVibration: {fileID: 1424931423}
+  autoFindJoystickVibration: 1
+  vibrateOnProximity: 1
+  vibrationStartDistance: 0.15
+  vibrationStopDistance: 0.18
+  stopVibrationOnDisable: 1
   drawGizmos: 1
   hitColor: {r: 0, g: 1, b: 0, a: 1}
   missColor: {r: 1, g: 0, b: 0, a: 1}
+--- !u!114 &1424931423
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1424931420}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f0c4e6b2a844d4b9e2f3a1c5b6d8e90, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JoystickVibrationHidOutput
+  vendorId: 51966
+  productId: 16388
+  connectOnStart: 1
+  reconnectInterval: 1
+  reportIdPrefix: 0
+  motorOnValue: 1
+  motorOffValue: 0
+  turnOffOnDisable: 1
+  logConnection: 1
 --- !u!1001 &1485994983
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4237,7 +4265,7 @@ MonoBehaviour:
   start_movement: 0
   speed: 50
   stroke: 0
-  _toggleGripAction: {fileID: -4485950433242979916, guid: 70be9397c9ebb834f8ff32c049feda85, type: 3}
+  _toggleGripAction: {fileID: 3442895328808473588, guid: 87958b3c41736aa42a5cdbf3483fe7cb, type: 3}
   _gripperController: {fileID: 1721627818}
   in_position: 0
 --- !u!54 &1721627820
@@ -4288,7 +4316,7 @@ MonoBehaviour:
   _moveX: {fileID: 4955773679336709069, guid: 87958b3c41736aa42a5cdbf3483fe7cb, type: 3}
   _moveY: {fileID: -4584657972706983448, guid: 87958b3c41736aa42a5cdbf3483fe7cb, type: 3}
   _moveZ: {fileID: -6247658701139567100, guid: 87958b3c41736aa42a5cdbf3483fe7cb, type: 3}
-  _modoCamara: {fileID: -6615664736554776456, guid: 70be9397c9ebb834f8ff32c049feda85, type: 3}
+  _modoCamara: {fileID: 4113322477059748619, guid: 87958b3c41736aa42a5cdbf3483fe7cb, type: 3}
   _endEffector: {fileID: 1721627814}
   _speed: 0.2
   _jointActionTexts:

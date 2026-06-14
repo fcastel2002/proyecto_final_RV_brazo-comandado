@@ -50,6 +50,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Pausa",
+                    "type": "Button",
+                    "id": "83f30e41-0344-4524-ab3d-03c035c70edb",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -89,7 +98,7 @@
                 {
                     "name": "",
                     "id": "98c55a44-58a8-472f-9f0b-b611ef0e1723",
-                    "path": "<Keyboard>/space",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/trigger",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -100,11 +109,22 @@
                 {
                     "name": "",
                     "id": "0b76bf01-45ab-4e97-a500-b54716e28a3f",
-                    "path": "<Keyboard>/leftCtrl",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/button2",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "Camera Toggle",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "19be8353-b1df-4f51-9af9-b187ec221cb4",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/trigger",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Pausa",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

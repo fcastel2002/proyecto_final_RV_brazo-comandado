@@ -21,6 +21,14 @@ public class GripperDistanceSensor : MonoBehaviour
     [SerializeField] private string unsafeGripText = "Ajustar posicion";
     [SerializeField] private string noDetectionStatusText = "Sin objeto detectado";
 
+    [Header("Joystick vibration")]
+    [SerializeField] private JoystickVibrationHidOutput joystickVibration;
+    [SerializeField] private bool autoFindJoystickVibration = true;
+    [SerializeField] private bool vibrateOnProximity = true;
+    [SerializeField] private float vibrationStartDistance = 0.15f;
+    [SerializeField] private float vibrationStopDistance = 0.18f;
+    [SerializeField] private bool stopVibrationOnDisable = true;
+
     [Header("Debug")]
     [SerializeField] private bool drawGizmos = true;
     [SerializeField] private Color hitColor = Color.green;
@@ -30,13 +38,28 @@ public class GripperDistanceSensor : MonoBehaviour
     public float Distance { get; private set; }
     public RaycastHit Hit { get; private set; }
     public bool IsGripDistanceSafe { get; private set; }
+    public bool IsVibratingForProximity { get; private set; }
 
     private Transform Origin => sensorOrigin != null ? sensorOrigin : transform;
+
+    private void Awake()
+    {
+        if (joystickVibration == null && autoFindJoystickVibration)
+            joystickVibration = FindFirstObjectByType<JoystickVibrationHidOutput>();
+    }
 
     private void Update()
     {
         MeasureDistance();
         UpdateUi();
+        UpdateJoystickVibration();
+    }
+
+    private void OnDisable()
+    {
+        if (!stopVibrationOnDisable) return;
+
+        SetProximityVibration(false);
     }
 
     private void MeasureDistance()
@@ -86,6 +109,40 @@ public class GripperDistanceSensor : MonoBehaviour
         }
 
         operatorStatusText.text = IsGripDistanceSafe ? safeGripText : unsafeGripText;
+    }
+
+    private void UpdateJoystickVibration()
+    {
+        if (!vibrateOnProximity || joystickVibration == null)
+        {
+            SetProximityVibration(false);
+            return;
+        }
+
+        float threshold = IsVibratingForProximity
+            ? vibrationStopDistance
+            : vibrationStartDistance;
+
+        bool shouldVibrate = HasHit && Distance <= threshold;
+        SetProximityVibration(shouldVibrate);
+    }
+
+    private void SetProximityVibration(bool enabled)
+    {
+        if (IsVibratingForProximity == enabled) return;
+
+        IsVibratingForProximity = enabled;
+        joystickVibration?.SetMotor(enabled);
+    }
+
+    private void OnValidate()
+    {
+        maxDistance = Mathf.Max(0f, maxDistance);
+        sphereRadius = Mathf.Max(0f, sphereRadius);
+        safeGripMinDistance = Mathf.Max(0f, safeGripMinDistance);
+        safeGripMaxDistance = Mathf.Max(safeGripMinDistance, safeGripMaxDistance);
+        vibrationStartDistance = Mathf.Max(0f, vibrationStartDistance);
+        vibrationStopDistance = Mathf.Max(vibrationStartDistance, vibrationStopDistance);
     }
 
     private void OnDrawGizmos()

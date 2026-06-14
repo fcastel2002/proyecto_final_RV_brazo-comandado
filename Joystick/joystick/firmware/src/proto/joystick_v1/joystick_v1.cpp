@@ -10,8 +10,8 @@ extern "C" {
 #include "joystick_analog.h"
 #include "vibration_motor.h"
 
-static constexpr uint SWITCH_LEFT_GPIO = 16;
-static constexpr uint SWITCH_RIGHT_GPIO = 17;
+static constexpr uint SWITCH_LEFT_GPIO = 14;
+static constexpr uint SWITCH_RIGHT_GPIO = 13;
 static constexpr uint16_t CENTERED_AXIS_ADC = 2048;
 
 static void init_switch(uint gpio) {
