@@ -38,10 +38,21 @@ public class JoystickAdapter : MonoBehaviour
     [SerializeField] private TextMeshProUGUI[] _jointActionTexts = new TextMeshProUGUI[6];
     [SerializeField] private string _jointActionFormat = "F3";
 
-    [Header("PID - Base gains (tunear en Inspector)")]
-    [SerializeField] private float _kpBase = 5f;
-    [SerializeField] private float _kiBase = 0.5f;
-    [SerializeField] private float _kdBase = 0.1f;
+    [Header("PID - Ganancias base")]
+    [Tooltip("Ganancia proporcional. Unidades: (°/s²) / (°) a inercia de referencia.")]
+    [SerializeField] private float _kpBase = 20f;
+    [Tooltip("Ganancia integral. Unidades: (°/s²) / (°·s) a inercia de referencia.")]
+    [SerializeField] private float _kiBase = 1f;
+    [Tooltip("Ganancia derivativa. Unidades: (°/s²) / (°/s) a inercia de referencia.")]
+    [SerializeField] private float _kdBase = 0.5f;
+
+    [Header("Simulación de Inercia")]
+    [Tooltip("Inercia de referencia (kg·m²). J2 del KUKA ≈ 100 kg·m². El resto de joints escala relativamente.")]
+    [SerializeField] private float _referenceInertia = 100f;
+    [Tooltip("Amortiguamiento viscoso (s⁻¹). Previene que los joints se aceleren indefinidamente.")]
+    [SerializeField] private float _velocityDamping = 5f;
+    [Tooltip("Velocidad angular máxima por joint (°/s). Límite de seguridad cinemático.")]
+    [SerializeField] private float _maxJointVelocity = 60f;
 
     /// <summary>true = modo camara activo, false = modo robot activo.</summary>
     public static bool IsCameraMode { get; private set; }
@@ -53,6 +64,9 @@ public class JoystickAdapter : MonoBehaviour
 
     private Vector3 _velocity;
     private JointPID[] _pids;
+    private float[] _jointVelocity = new float[6];
+    private Quaternion _fixedTcpOrientation;
+    private bool _orientationCaptured;
     private readonly float[] _lastJointControlActions = new float[6];
 
     public float[] LastJointControlActions => _lastJointControlActions;
@@ -89,6 +103,7 @@ public class JoystickAdapter : MonoBehaviour
             InitDefaultMapping();
 
         InitPIDs();
+        CaptureFixedOrientation();
         ClearJointActionDisplay();
     }
 
@@ -101,6 +116,7 @@ public class JoystickAdapter : MonoBehaviour
         {
             RemapAxesFromCamera();
             ResetPIDs();
+            CaptureFixedOrientation();
         }
 
         Debug.Log($"[JoystickAdapter] Modo: {(IsCameraMode ? "CAMARA" : "ROBOT")} | dirZ={_dirZ * _signZ} | dirX={_dirX * _signX}");
@@ -131,14 +147,19 @@ public class JoystickAdapter : MonoBehaviour
 
         if (_velocity.sqrMagnitude < 1e-6f)
         {
+            System.Array.Clear(_jointVelocity, 0, 6);
             ClearJointActionDisplay();
             return;
         }
 
+        if (!_orientationCaptured)
+            CaptureFixedOrientation();
+        if (!_orientationCaptured) return;
+
         var delta = _velocity * (_speed * Time.fixedDeltaTime);
         var currentPose = _controller.PoseObserver.ToolCenterPointFrame.Value;
-        var offset = Matrix4x4.TRS(delta, Quaternion.identity, Vector3.one);
-        var targetPose = offset * currentPose;
+        Vector3 currentPos = (Vector3)currentPose.GetColumn(3);
+        var targetPose = Matrix4x4.TRS(currentPos + delta, _fixedTcpOrientation, Vector3.one);
 
         var frame = _controller.Frame.Value;
         var tool = _controller.Tool.Value;
@@ -157,6 +178,13 @@ public class JoystickAdapter : MonoBehaviour
         ApplyPID(solution.JointTarget, Time.fixedDeltaTime);
     }
 
+    private void CaptureFixedOrientation()
+    {
+        if (_controller == null || !_controller.IsValid.Value) return;
+        _fixedTcpOrientation = _controller.PoseObserver.ToolCenterPointFrame.Value.rotation;
+        _orientationCaptured = true;
+    }
+
     private void InitPIDs()
     {
         _pids = new JointPID[6];
@@ -171,6 +199,7 @@ public class JoystickAdapter : MonoBehaviour
         foreach (var pid in _pids)
             pid.Reset();
 
+        System.Array.Clear(_jointVelocity, 0, 6);
         ClearJointActionDisplay();
     }
 
@@ -184,11 +213,20 @@ public class JoystickAdapter : MonoBehaviour
         {
             float qTarget = ikTarget[i];
             float qActual = _controller.MechanicalGroup.JointState[i];
-            _pids[i].Ki = _kiBase / Mathf.Max(jEff[i], 0.01f);
 
-            float controlAction = _pids[i].Compute(qTarget, qActual, dt);
-            _lastJointControlActions[i] = controlAction;
-            qNew[i] = qActual + controlAction;
+            // PID → torque virtual (°/s² a inercia de referencia)
+            float torque = _pids[i].Compute(qTarget, qActual, dt);
+            _lastJointControlActions[i] = torque;
+
+            // Aceleración = torque / inercia normalizada → joints más pesados aceleran más lento
+            float jNorm = Mathf.Max(jEff[i] / _referenceInertia, 0.001f);
+            _jointVelocity[i] += (torque / jNorm) * dt;
+
+            // Amortiguamiento viscoso: evita aceleración indefinida
+            _jointVelocity[i] -= _velocityDamping * _jointVelocity[i] * dt;
+            _jointVelocity[i] = Mathf.Clamp(_jointVelocity[i], -_maxJointVelocity, _maxJointVelocity);
+
+            qNew[i] = qActual + _jointVelocity[i] * dt;
         }
 
         UpdateJointActionDisplay();

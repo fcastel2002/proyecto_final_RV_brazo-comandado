@@ -12,14 +12,17 @@ Código fuente en: Library/PackageCache/com.preliy.flange@34040b32179a/
 Assets/Scripts/ — scripts propios del equipo
 
 ## Objetivo actual
-Implementar dinámica del robot:
-- Joystick analógico → consignas de velocidad en ejes TCP (proporcional al desplazamiento)
-- Integración de velocidad → consignas de posición TCP
-- IK de Flange → ángulos articulares objetivo
-- Controladores PID por articulación (q1–q6)
-- Masas realistas en eslabones para simular inercia
-- Efecto esperado: cargas más pesadas generan respuesta más lenta, 
-  compensada por acción integral del PID (especialmente q2 y q3)
+La dinámica del robot está implementada. Flujo vigente:
+- Joystick analógico → `_velocity` (Vector3, ejes TCP remapeados desde cámara)
+- Integración de velocidad → delta de posición TCP → `targetPose` (orientación fija)
+- IK de Flange (`ComputeInverse`) → ángulos articulares objetivo (q1–q6)
+- PID por articulación (`JointPID.Compute`) → torque virtual
+- Inercia simulada (`RobotDynamics.ComputeEffectiveInertia`, masas URDF reales) →
+  normaliza la aceleración: joints más pesados responden más lento
+- `SetJoints()` recibe solo ángulos finales; Flange NO recibe torques físicos
+
+Ver arquitectura detallada con referencias exactas archivo:línea en:
+`Assets/Scripts/_ARQUITECTURA_CONTROL.md`
 
 ## Hardware de entrada
 PS4 controller vía Unity Input System
