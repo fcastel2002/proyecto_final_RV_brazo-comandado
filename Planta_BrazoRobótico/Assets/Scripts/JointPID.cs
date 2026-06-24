@@ -31,7 +31,7 @@ public class JointPID
     /// </summary>
     public float Compute(float setpoint, float current, float dt)
     {
-        float error = setpoint - current;
+        float error = Mathf.DeltaAngle(current, setpoint);
         _integral = Mathf.Clamp(_integral + error * dt, -MaxIntegral, MaxIntegral);
         float derivative = dt > 1e-6f ? (error - _prevError) / dt : 0f;
         _prevError = error;

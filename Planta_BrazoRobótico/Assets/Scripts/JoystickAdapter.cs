@@ -306,7 +306,7 @@ public class JoystickAdapter : MonoBehaviour
             _lastJointControlActions[i] = torque;
 
             // Aceleración = torque / inercia normalizada → joints más pesados aceleran más lento
-            float jNorm = Mathf.Max(jEff[i] / _referenceInertia, 0.001f);
+            float jNorm = Mathf.Max(jEff[i] / _referenceInertia, 0.05f);
             _jointVelocity[i] += (torque / jNorm) * dt;
 
             // Amortiguamiento viscoso: evita aceleración indefinida

@@ -5,6 +5,8 @@ using UnityEngine.InputSystem;
 
 public class InputProfileSwitcher : MonoBehaviour
 {
+    private const string SavedProfilePlayerPrefsKey = "InputProfileSwitcher.ActiveProfile";
+
     public enum InputProfileKind
     {
         PS4,
@@ -40,6 +42,7 @@ public class InputProfileSwitcher : MonoBehaviour
     [Header("Startup")]
     [SerializeField] private InputProfileKind defaultProfile = InputProfileKind.PS4;
     [SerializeField] private bool applyDefaultOnStart = true;
+    [SerializeField] private bool rememberSelectedProfile = true;
 
     [Header("Global Menu Input")]
     [SerializeField] private bool invertVr2MenuHorizontal;
@@ -63,7 +66,7 @@ public class InputProfileSwitcher : MonoBehaviour
         EnsureTargets();
 
         if (applyDefaultOnStart)
-            ApplyProfile(defaultProfile);
+            ApplyProfile(GetStartupProfile());
     }
 
     private void OnDestroy()
@@ -120,6 +123,7 @@ public class InputProfileSwitcher : MonoBehaviour
         ApplyAxisUiBindings(actions);
         EnableGlobalActions();
         ApplySimulationInputState();
+        SaveSelectedProfile();
         ActiveProfileChanged?.Invoke(ActiveProfile);
 
         Debug.Log($"[InputProfileSwitcher] Perfil activo: {GetDisplayName(ActiveProfile)}");
@@ -268,6 +272,27 @@ public class InputProfileSwitcher : MonoBehaviour
         };
 
         return HasRequiredRobotActions(actions, "VR-2");
+    }
+
+    private InputProfileKind GetStartupProfile()
+    {
+        if (!rememberSelectedProfile || !PlayerPrefs.HasKey(SavedProfilePlayerPrefsKey))
+            return defaultProfile;
+
+        int savedProfile = PlayerPrefs.GetInt(SavedProfilePlayerPrefsKey, (int)defaultProfile);
+        if (Enum.IsDefined(typeof(InputProfileKind), savedProfile))
+            return (InputProfileKind)savedProfile;
+
+        return defaultProfile;
+    }
+
+    private void SaveSelectedProfile()
+    {
+        if (!rememberSelectedProfile)
+            return;
+
+        PlayerPrefs.SetInt(SavedProfilePlayerPrefsKey, (int)ActiveProfile);
+        PlayerPrefs.Save();
     }
 
     private bool HasRequiredRobotActions(ResolvedProfile actions, string profileName)

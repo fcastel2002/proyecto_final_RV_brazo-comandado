@@ -976,84 +976,6 @@ MonoBehaviour:
   m_BlockingMask:
     serializedVersion: 2
     m_Bits: 4294967295
---- !u!114 &317623019
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 317623014}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7836935bb16c4faea29126bfacb8bbc5, type: 3}
-  m_Name: ""
-  m_EditorClassIdentifier: Assembly-CSharp::InputProfileSwitcher
-  joystickAdapter: {fileID: 1731028598}
-  cameraController: {fileID: 330585548}
-  gripperController: {fileID: 1721627819}
-  calibrationManager: {fileID: 317623021}
-  axisUiBindings: []
-  autoDiscoverAxisUi: 1
-  ps4JoystickAsset: {fileID: -944628639613478452, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
-  robotBasicAsset: {fileID: -944628639613478452, guid: 87958b3c41736aa42a5cdbf3483fe7cb, type: 3}
-  defaultProfile: 0
-  applyDefaultOnStart: 1
-  invertVr2MenuHorizontal: 0
-  invertVr2MenuVertical: 0
---- !u!114 &317623020
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 317623014}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9714655c9e574357b65f2c3966fc013d, type: 3}
-  m_Name: ""
-  m_EditorClassIdentifier: Assembly-CSharp::PauseMenuController
-  pauseMenuRoot: {fileID: 0}
-  continueButton: {fileID: 0}
-  ps4Button: {fileID: 0}
-  vr2Button: {fileID: 0}
-  calibrateButton: {fileID: 0}
-  finishCalibrationButton: {fileID: 0}
-  resetCalibrationButton: {fileID: 0}
-  activeProfileText: {fileID: 0}
-  calibrationStatusText: {fileID: 0}
-  futureOptionsContainer: {fileID: 0}
-  overlayColor: {r: 0, g: 0, b: 0, a: 0.55}
-  panelColor: {r: 0.08, g: 0.09, b: 0.11, a: 0.96}
-  normalButtonColor: {r: 0.18, g: 0.23, b: 0.3, a: 1}
-  highlightedButtonColor: {r: 0.28, g: 0.39, b: 0.52, a: 1}
-  selectedButtonColor: {r: 0.95, g: 0.72, b: 0.22, a: 1}
-  pressedButtonColor: {r: 0.11, g: 0.16, b: 0.22, a: 1}
-  disabledButtonColor: {r: 0.18, g: 0.2, b: 0.23, a: 0.72}
-  buttonTextColor: {r: 1, g: 1, b: 1, a: 1}
-  selectedButtonTextColor: {r: 0, g: 0, b: 0, a: 1}
-  inputProfileSwitcher: {fileID: 317623019}
-  calibrationManager: {fileID: 317623021}
-  cameraButtonHoldSeconds: 2
-  buttonPressThreshold: 0.5
-  pauseWithTimeScale: 1
-  unlockCursorWhenPaused: 1
-  navigationThreshold: 0.55
-  navigationRepeatDelay: 0.35
-  navigationRepeatRate: 0.14
---- !u!114 &317623021
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 317623014}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 108af264fe284d73943d4446f5c7da02, type: 3}
-  m_Name: ""
-  m_EditorClassIdentifier: Assembly-CSharp::AnalogCalibrationManager
-  deadZone: 0.05
-  minimumCalibrationRange: 0.25
 --- !u!114 &317623016
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1064,7 +986,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
   m_UiScaleMode: 0
   m_ReferencePixelsPerUnit: 100
@@ -1123,6 +1045,85 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &317623019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 317623014}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7836935bb16c4faea29126bfacb8bbc5, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::InputProfileSwitcher
+  joystickAdapter: {fileID: 1731028598}
+  cameraController: {fileID: 330585548}
+  gripperController: {fileID: 1721627819}
+  calibrationManager: {fileID: 317623021}
+  axisUiBindings: []
+  autoDiscoverAxisUi: 1
+  ps4JoystickAsset: {fileID: -944628639613478452, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
+  robotBasicAsset: {fileID: -944628639613478452, guid: 87958b3c41736aa42a5cdbf3483fe7cb, type: 3}
+  defaultProfile: 0
+  applyDefaultOnStart: 1
+  rememberSelectedProfile: 1
+  invertVr2MenuHorizontal: 0
+  invertVr2MenuVertical: 0
+--- !u!114 &317623020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 317623014}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9714655c9e574357b65f2c3966fc013d, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PauseMenuController
+  pauseMenuRoot: {fileID: 0}
+  continueButton: {fileID: 0}
+  ps4Button: {fileID: 0}
+  vr2Button: {fileID: 0}
+  calibrateButton: {fileID: 0}
+  finishCalibrationButton: {fileID: 0}
+  resetCalibrationButton: {fileID: 0}
+  activeProfileText: {fileID: 0}
+  calibrationStatusText: {fileID: 0}
+  futureOptionsContainer: {fileID: 0}
+  overlayColor: {r: 0, g: 0, b: 0, a: 0.55}
+  panelColor: {r: 0.08, g: 0.09, b: 0.11, a: 0.96}
+  normalButtonColor: {r: 0.94272786, g: 0.9433962, b: 0.9211463, a: 1}
+  highlightedButtonColor: {r: 0.23921569, g: 0.6638175, b: 0.9254902, a: 1}
+  selectedButtonColor: {r: 0.21960784, g: 0.9490196, b: 0.36727834, a: 1}
+  pressedButtonColor: {r: 0.11, g: 0.16, b: 0.22, a: 1}
+  disabledButtonColor: {r: 0.18, g: 0.2, b: 0.23, a: 0.72}
+  buttonTextColor: {r: 0, g: 0, b: 0, a: 1}
+  selectedButtonTextColor: {r: 0, g: 0, b: 0, a: 1}
+  inputProfileSwitcher: {fileID: 317623019}
+  calibrationManager: {fileID: 317623021}
+  cameraButtonHoldSeconds: 2
+  buttonPressThreshold: 0.5
+  pauseWithTimeScale: 1
+  unlockCursorWhenPaused: 1
+  navigationThreshold: 0.55
+  navigationRepeatDelay: 0.35
+  navigationRepeatRate: 0.14
+--- !u!114 &317623021
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 317623014}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 108af264fe284d73943d4446f5c7da02, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::AnalogCalibrationManager
+  deadZone: 0.05
+  minimumCalibrationRange: 0.25
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -1453,7 +1454,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 364596213}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -2050,6 +2051,7 @@ MonoBehaviour:
   axisInputValue: {fileID: -8327135674230221225, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   visualAxisValue: {fileID: 1128885105}
   axisValueText: {fileID: 465774453}
+  calibrationManager: {fileID: 0}
 --- !u!114 &465774453 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1538013521803520012, guid: efbd40407cca4b94db45a983d1c69a99, type: 3}
@@ -2105,7 +2107,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 480840681}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -2224,7 +2226,7 @@ RectTransform:
   m_GameObject: {fileID: 593246425}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 2.343925, y: 1.8370354, z: 1.4331}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4432609962965866317}
@@ -2234,7 +2236,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 391.39, y: 14.900002}
+  m_AnchoredPosition: {x: 419.52, y: -78.911934}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0, y: 0}
 --- !u!114 &593246427
@@ -2307,7 +2309,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 672847158}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -2444,7 +2446,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 763840976}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -2800,6 +2802,7 @@ MonoBehaviour:
   axisInputValue: {fileID: 807227065330725814, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   visualAxisValue: {fileID: 1701610478}
   axisValueText: {fileID: 332246199}
+  calibrationManager: {fileID: 0}
 --- !u!1 &989944649
 GameObject:
   m_ObjectHideFlags: 0
@@ -3856,7 +3859,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1600461223}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -3993,7 +3996,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1659166255}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -4398,9 +4401,9 @@ MonoBehaviour:
   _moveX: {fileID: 5248669554260487233, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _moveY: {fileID: 807227065330725814, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _moveZ: {fileID: -8327135674230221225, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
-  _invertMoveX: 0
+  _invertMoveX: 1
   _invertMoveY: 0
-  _invertMoveZ: 0
+  _invertMoveZ: 1
   _calibrationManager: {fileID: 317623021}
   _modoCamara: {fileID: -4946550936969249809, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _cameraModeAllowed: 1
@@ -4695,7 +4698,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6475700360738678975, guid: efbd40407cca4b94db45a983d1c69a99, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -7.7899895
+      value: -7.7
       objectReference: {fileID: 0}
     - target: {fileID: 6475700360738678975, guid: efbd40407cca4b94db45a983d1c69a99, type: 3}
       propertyPath: m_AnchoredPosition.y
@@ -5089,7 +5092,7 @@ RectTransform:
   m_GameObject: {fileID: 1939701510}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.51006866, y: 0.61007, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 593246426}
@@ -5103,7 +5106,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 237, y: 307}
+  m_AnchoredPosition: {x: 740, y: 390}
   m_SizeDelta: {x: -1061.7, y: -655.22986}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1939701512
@@ -6013,6 +6016,7 @@ MonoBehaviour:
   axisInputValue: {fileID: 5248669554260487233, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   visualAxisValue: {fileID: 1488148438}
   axisValueText: {fileID: 1176294175}
+  calibrationManager: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
