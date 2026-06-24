@@ -40,6 +40,7 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 	public int ctrl_state;
 	//  Tracks whether the gripper is currently open.
 	private bool _isOpen = false;
+	private bool _inputSuppressed;
 
 	// Public variables.
 	public bool start_movement;
@@ -68,24 +69,34 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 	{
 		Debug.Log("[Gripper] OnEnable called");
 
-		if (_toggleGripAction != null)
-		{
-			_toggleGripAction.action.Enable();
-			_toggleGripAction.action.performed += OnToggleGrip;
-		}
+		EnableInputAction();
 	}
 
 	private void OnDisable()
 	{
-		if (_toggleGripAction != null)
-		{
-			_toggleGripAction.action.performed -= OnToggleGrip;
-			_toggleGripAction.action.Disable();
-		}
+		DisableInputAction();
+	}
+
+	public void ApplyInputAction(InputActionReference toggleGripAction)
+	{
+		DisableInputAction();
+
+		_toggleGripAction = toggleGripAction;
+
+		if (isActiveAndEnabled)
+			EnableInputAction();
+	}
+
+	public void SetInputSuppressed(bool suppressed)
+	{
+		_inputSuppressed = suppressed;
 	}
 
 	private void OnToggleGrip(InputAction.CallbackContext ctx)
 	{
+		if (_inputSuppressed)
+			return;
+
 		// Toggle open ↔ closed.
 		_isOpen = !_isOpen;
 		Debug.Log($"[Gripper] Toggle → _isOpen={_isOpen}, stroke={(_isOpen ? s_max : s_min)}");
@@ -229,5 +240,21 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 		}
 
 		return y;
+	}
+
+	private void EnableInputAction()
+	{
+		if (_toggleGripAction == null) return;
+
+		_toggleGripAction.action.Enable();
+		_toggleGripAction.action.performed += OnToggleGrip;
+	}
+
+	private void DisableInputAction()
+	{
+		if (_toggleGripAction == null) return;
+
+		_toggleGripAction.action.performed -= OnToggleGrip;
+		_toggleGripAction.action.Disable();
 	}
 }

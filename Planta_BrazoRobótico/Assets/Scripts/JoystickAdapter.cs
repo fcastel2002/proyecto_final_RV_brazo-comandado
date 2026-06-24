@@ -22,8 +22,15 @@ public class JoystickAdapter : MonoBehaviour
     [SerializeField] private InputActionReference _moveY;
     [SerializeField] private InputActionReference _moveZ;
 
+    [Header("Axis Direction")]
+    [SerializeField] private bool _invertMoveX;
+    [SerializeField] private bool _invertMoveY;
+    [SerializeField] private bool _invertMoveZ;
+    [SerializeField] private AnalogCalibrationManager _calibrationManager;
+
     [Header("Mode Toggle")]
     [SerializeField] private InputActionReference _modoCamara;
+    [SerializeField] private bool _cameraModeAllowed = true;
 
     [Header("Efector final (para el remapeo de ejes)")]
     [Tooltip("Asignar el transform del Joint_6 / Flange")]
@@ -67,34 +74,47 @@ public class JoystickAdapter : MonoBehaviour
     private float[] _jointVelocity = new float[6];
     private Quaternion _fixedTcpOrientation;
     private bool _orientationCaptured;
+    private bool _inputSuppressed;
     private readonly float[] _lastJointControlActions = new float[6];
 
     public float[] LastJointControlActions => _lastJointControlActions;
 
+    private void Awake()
+    {
+        if (_calibrationManager == null)
+            _calibrationManager = FindFirstObjectByType<AnalogCalibrationManager>();
+    }
+
     private void OnEnable()
     {
-        _moveX?.action.Enable();
-        _moveY?.action.Enable();
-        _moveZ?.action.Enable();
-
-        if (_modoCamara != null)
-        {
-            _modoCamara.action.Enable();
-            _modoCamara.action.performed += OnModoCamaraToggle;
-        }
+        EnableInputActions();
     }
 
     private void OnDisable()
     {
-        _moveX?.action.Disable();
-        _moveY?.action.Disable();
-        _moveZ?.action.Disable();
+        DisableInputActions();
+    }
 
-        if (_modoCamara != null)
-        {
-            _modoCamara.action.performed -= OnModoCamaraToggle;
-            _modoCamara.action.Disable();
-        }
+    public void ApplyInputActions(
+        InputActionReference moveX,
+        InputActionReference moveY,
+        InputActionReference moveZ,
+        InputActionReference modoCamara,
+        bool cameraModeAllowed)
+    {
+        DisableInputActions();
+
+        _moveX = moveX;
+        _moveY = moveY;
+        _moveZ = moveZ;
+        _modoCamara = modoCamara;
+        _cameraModeAllowed = cameraModeAllowed;
+
+        ExitCameraModeForProfileChange();
+        ResetInputState();
+
+        if (isActiveAndEnabled)
+            EnableInputActions();
     }
 
     private void Start()
@@ -107,8 +127,11 @@ public class JoystickAdapter : MonoBehaviour
         ClearJointActionDisplay();
     }
 
-    private void OnModoCamaraToggle(InputAction.CallbackContext ctx)
+    public void ToggleCameraMode()
     {
+        if (!_cameraModeAllowed)
+            return;
+
         bool wasCameraMode = IsCameraMode;
         IsCameraMode = !IsCameraMode;
 
@@ -122,8 +145,29 @@ public class JoystickAdapter : MonoBehaviour
         Debug.Log($"[JoystickAdapter] Modo: {(IsCameraMode ? "CAMARA" : "ROBOT")} | dirZ={_dirZ * _signZ} | dirX={_dirX * _signX}");
     }
 
+    public void SetInputSuppressed(bool suppressed)
+    {
+        if (_inputSuppressed == suppressed)
+            return;
+
+        _inputSuppressed = suppressed;
+
+        if (_inputSuppressed)
+        {
+            _velocity = Vector3.zero;
+            ClearJointActionDisplay();
+        }
+    }
+
     private void Update()
     {
+        if (_inputSuppressed)
+        {
+            _velocity = Vector3.zero;
+            ClearJointActionDisplay();
+            return;
+        }
+
         if (IsCameraMode)
         {
             _velocity = Vector3.zero;
@@ -131,9 +175,9 @@ public class JoystickAdapter : MonoBehaviour
             return;
         }
 
-        float rawX = _moveX?.action.ReadValue<float>() ?? 0f;
-        float rawY = _moveY?.action.ReadValue<float>() ?? 0f;
-        float rawZ = _moveZ?.action.ReadValue<float>() ?? 0f;
+        float rawX = ReadAxis(_moveX, _invertMoveX);
+        float rawY = ReadAxis(_moveY, _invertMoveY);
+        float rawZ = ReadAxis(_moveZ, _invertMoveZ);
 
         _velocity = _dirX * (rawX * _signX)
                   + Vector3.up * rawY
@@ -183,6 +227,49 @@ public class JoystickAdapter : MonoBehaviour
         if (_controller == null || !_controller.IsValid.Value) return;
         _fixedTcpOrientation = _controller.PoseObserver.ToolCenterPointFrame.Value.rotation;
         _orientationCaptured = true;
+    }
+
+    private float ReadAxis(InputActionReference actionReference, bool invert)
+    {
+        float value = _calibrationManager != null
+            ? _calibrationManager.ReadCalibrated(actionReference)
+            : actionReference?.action.ReadValue<float>() ?? 0f;
+
+        return invert ? -value : value;
+    }
+
+    private void EnableInputActions()
+    {
+        _moveX?.action.Enable();
+        _moveY?.action.Enable();
+        _moveZ?.action.Enable();
+
+        _modoCamara?.action.Enable();
+    }
+
+    private void DisableInputActions()
+    {
+        _moveX?.action.Disable();
+        _moveY?.action.Disable();
+        _moveZ?.action.Disable();
+
+        _modoCamara?.action.Disable();
+    }
+
+    private void ExitCameraModeForProfileChange()
+    {
+        if (IsCameraMode)
+            RemapAxesFromCamera();
+
+        IsCameraMode = false;
+    }
+
+    private void ResetInputState()
+    {
+        _velocity = Vector3.zero;
+        ResetPIDs();
+        CaptureFixedOrientation();
+        ClearJointActionDisplay();
     }
 
     private void InitPIDs()

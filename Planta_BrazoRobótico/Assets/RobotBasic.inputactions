@@ -59,6 +59,33 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": true
+                },
+                {
+                    "name": "Click",
+                    "type": "Button",
+                    "id": "cacd1c64-771a-460f-b130-0812b228d5d7",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "SelectorUP/DOWN",
+                    "type": "Value",
+                    "id": "faf3c678-cb6f-4312-9897-e8439daa8216",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "SelectorLEFT/RIGHT",
+                    "type": "Value",
+                    "id": "0a52355f-3aab-4e2a-8fc9-bb2116aee358",
+                    "expectedControlType": "Axis",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
                 }
             ],
             "bindings": [
@@ -125,6 +152,39 @@
                     "processors": "",
                     "groups": "",
                     "action": "Pausa",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "1ed1015c-0cee-4a74-82a8-c76df6b61055",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/button2",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Click",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "028f3d23-2573-4ce8-aa6a-2734cad6a376",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/z",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SelectorUP/DOWN",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f1161c1a-d6b8-4996-a2e7-1b5361dc3498",
+                    "path": "<HID::GrupoVRobotics Joystick VR-v2>/stick/y",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SelectorLEFT/RIGHT",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

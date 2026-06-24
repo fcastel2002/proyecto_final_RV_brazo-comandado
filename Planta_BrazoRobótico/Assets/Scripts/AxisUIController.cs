@@ -15,12 +15,23 @@ public class AxisUIController : MonoBehaviour
     [Header("Setting")]
     private float neutralOffset = 50f;
 
+    [SerializeField] private AnalogCalibrationManager calibrationManager;
+
+    public InputActionReference CurrentInputAction => axisInputValue;
+
 
     
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        
+        if (calibrationManager == null)
+            calibrationManager = FindFirstObjectByType<AnalogCalibrationManager>();
+    }
+
+    public void SetInputAction(InputActionReference axisAction)
+    {
+        axisInputValue = axisAction;
+        UpdateVisuals(0f);
     }
 
     // Update is called once per frame
@@ -28,7 +39,10 @@ public class AxisUIController : MonoBehaviour
     {
         if (axisInputValue != null && axisInputValue.action != null)
         {
-            float currentInputValue = axisInputValue.action.ReadValue<float>();
+            float currentInputValue = calibrationManager != null
+                ? calibrationManager.ReadCalibrated(axisInputValue)
+                : axisInputValue.action.ReadValue<float>();
+
             UpdateVisuals(currentInputValue);
         }
     }
