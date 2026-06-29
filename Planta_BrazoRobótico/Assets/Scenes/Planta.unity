@@ -986,7 +986,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
   m_UiScaleMode: 0
   m_ReferencePixelsPerUnit: 100
@@ -1055,7 +1055,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7836935bb16c4faea29126bfacb8bbc5, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InputProfileSwitcher
   joystickAdapter: {fileID: 1731028598}
   cameraController: {fileID: 330585548}
@@ -1080,7 +1080,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9714655c9e574357b65f2c3966fc013d, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PauseMenuController
   pauseMenuRoot: {fileID: 0}
   continueButton: {fileID: 0}
@@ -1120,7 +1120,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 108af264fe284d73943d4446f5c7da02, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AnalogCalibrationManager
   deadZone: 0.05
   minimumCalibrationRange: 0.25
@@ -4408,7 +4408,7 @@ MonoBehaviour:
   _modoCamara: {fileID: -4946550936969249809, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _cameraModeAllowed: 1
   _endEffector: {fileID: 1721627814}
-  _speed: 5.03
+  _speed: 1.07
   _jointActionTexts:
   - {fileID: 0}
   - {fileID: 0}
@@ -4417,12 +4417,14 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   _jointActionFormat: F3
-  _kpBase: 24.3
-  _kiBase: 1.9
-  _kdBase: 0.5
+  _kpBase: 10.8
+  _kiBase: 2.4
+  _kdBase: 0.65
   _referenceInertia: 5.39
-  _velocityDamping: 0.13
+  _velocityDamping: 1
   _maxJointVelocity: 60
+  _logIkPoseError: 1
+  _ikPoseLogInterval: 0.25
 --- !u!114 &1731028599 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}

@@ -1,243 +1,374 @@
-# Arquitectura de Control — Planta BrazoRobótico
-**Fecha:** 2026-06-20  
-**Branch:** FisicaEslabones  
-**Robot:** KUKA KR210 R3100-2 | **Librería IK:** Flange 1.0.11
+# Arquitectura de Control - Planta BrazoRobotico
+
+**Fecha:** 2026-06-24
+**Branch:** FisicaEslabones
+**Robot:** KUKA KR210 R3100-2
+**Libreria IK:** Flange 1.0.11
 
 ---
 
-## Diagrama de flujo completo
+## Objetivo de esta nota
 
-```
-PS4 Controller (Input System)
-        │
-        │  _moveX / _moveY / _moveZ  (InputActionReference)
-        ▼
-┌─────────────────────────────────────────────────────┐
-│  JoystickAdapter.Update()  [L134-140]               │
-│  rawX/Y/Z → _velocity (Vector3, mundo, remapeado)   │
-└─────────────────────────────────────────────────────┘
-        │
-        │  _velocity * _speed * fixedDeltaTime  [L159]
-        ▼
-┌─────────────────────────────────────────────────────┐
-│  JoystickAdapter.FixedUpdate()  [L143-178]          │
-│  delta → targetPose = TRS(pos + delta,              │
-│                           _fixedTcpOrientation,     │
-│                           one)           [L162]      │
-└─────────────────────────────────────────────────────┘
-        │
-        │  CartesianTarget(targetPose, cfg, extJoint)
-        ▼
-┌─────────────────────────────────────────────────────┐
-│  Flange: Solver.ComputeInverse()  [L170]            │
-│  → solution.JointTarget  (q1..q6 objetivo, °)       │
-└─────────────────────────────────────────────────────┘
-        │
-        │  solution.JointTarget + robotJoints actuales
-        ▼
-┌─────────────────────────────────────────────────────┐
-│  JoystickAdapter.ApplyPID()  [L206-234]             │
-│                                                     │
-│  RobotDynamics.ComputeEffectiveInertia()  [L209]    │
-│    → jEff[i]  (kg·m² por articulación)             │
-│                                                     │
-│  Para i = 0..5:                                     │
-│    error = qTarget[i] - qActual[i]                  │
-│    torque  = JointPID[i].Compute(...)  [L218]       │
-│    jNorm   = jEff[i] / _referenceInertia  [L222]    │
-│    vel    += (torque / jNorm) * dt  [L223]          │
-│    vel    -= _velocityDamping * vel * dt  [L226]    │
-│    vel     = Clamp(vel, ±_maxJointVelocity)  [L227] │
-│    qNew[i] = qActual + vel * dt  [L229]             │
-└─────────────────────────────────────────────────────┘
-        │
-        │  qNew[0..5]  (ángulos finales, °)
-        ▼
-┌─────────────────────────────────────────────────────┐
-│  MechanicalGroup.SetJoints(JointTarget(qNew))       │
-│  [JoystickAdapter.cs:233]                           │
-│  Flange NO recibe torques — solo ángulos            │
-└─────────────────────────────────────────────────────┘
-```
+Este documento describe la cadena real de control usada por `JoystickAdapter`.
+
+Las pruebas de cambio y el feedback observado se registran aparte en:
+
+`Assets/Scripts/_REGISTRO_PRUEBAS_CONTROL.md`
+
+La version actual evita soluciones que no funcionaron bien:
+
+- No mantiene un ultimo objetivo IK activo cuando los ejes del joystick vuelven a cero.
+- No detecta "movimiento vertical puro" ni aplica una correccion especial de orientacion.
+- No fija la orientacion del TCP contra mundo Unity.
+- No usa seguimiento articular directo de la solucion IK; esa prueba empeoro el comportamiento.
+
+La orientacion fija del TCP se expresa respecto del frame del robot/Flange. Por defecto se preserva la rotacion actual exacta del TCP, sin reconstruirla contra mundo ni forzar una nueva alineacion de eje.
 
 ---
 
-## 1. Punto de entrada de input
+## Flujo actual
+
+```text
+PS4 Controller / Input System
+        |
+        |  _moveX / _moveY / _moveZ
+        v
+JoystickAdapter.Update()
+        |
+        |  rawX/Y/Z calibrados
+        |  _velocity = _dirX * X + Vector3.up * Y + _dirZ * Z
+        v
+JoystickAdapter.FixedUpdate()
+        |
+        |  si _velocity ~= 0:
+        |      ResetPIDs()
+        |      CaptureFixedOrientation()
+        |      return
+        |
+        |  si empieza un nuevo recorrido:
+        |      ResetPIDs()
+        |      CaptureFixedOrientation()
+        |
+        |  deltaWorld = _velocity * _speed * fixedDeltaTime
+        |  deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint)
+        |  currentPose = solucion IK anterior o ToolCenterPointFrame
+        |  targetPose = TRS(currentPos + deltaFrame, _fixedTcpFrameOrientation, one)
+        v
+CartesianTarget(targetPose, configuration, extJoint)
+        |
+        v
+Flange Solver.ComputeInverse(target, tool, frame)
+        |
+        |  solution.JointTarget
+        v
+JoystickAdapter.ApplyPID(solution.JointTarget)
+        |
+        |  velocidad estimada del JointTarget
+        |  JointPID + RobotDynamics.ComputeEffectiveInertia()
+        |  inertia floor per joint group
+        |  damping + velocity clamp
+        v
+MechanicalGroup.SetJoints(new JointTarget(qNew), notify: true)
+```
+
+Flange recibe posiciones articulares. Unity Physics no aplica torques ni fuerzas al brazo principal.
+
+---
+
+## 1. Entrada de joystick
 
 **Archivo:** `Assets/Scripts/JoystickAdapter.cs`
 
-| InputActionReference | Campo Inspector | Eje lógico |
-|---|---|---|
-| `_moveX` | Stick derecho X | Desplazamiento lateral (mundo) |
-| `_moveY` | Stick izquierdo Y | Desplazamiento vertical |
-| `_moveZ` | Stick derecho Y | Desplazamiento frontal (hacia robot) |
-| `_modoCamara` | L3 (LS click) | Toggle modo cámara / modo robot |
+| Campo | Rol |
+|---|---|
+| `_moveX` | Movimiento lateral remapeado respecto de la vista del operador. |
+| `_moveY` | Movimiento vertical en mundo (`Vector3.up`). |
+| `_moveZ` | Movimiento frontal remapeado respecto de la vista del operador. |
+| `_modoCamara` | Toggle entre modo robot y modo camara. |
+| `_calibrationManager` | Lee ejes calibrados si esta disponible. |
 
-Lectura de ejes — `Update()`:
+`Update()` solo arma una velocidad cartesiana. No integra posicion y no llama IK.
+
 ```csharp
-// JoystickAdapter.cs:134-140
-float rawX = _moveX?.action.ReadValue<float>() ?? 0f;
-float rawY = _moveY?.action.ReadValue<float>() ?? 0f;
-float rawZ = _moveZ?.action.ReadValue<float>() ?? 0f;
+float rawX = ReadAxis(_moveX, _invertMoveX);
+float rawY = ReadAxis(_moveY, _invertMoveY);
+float rawZ = ReadAxis(_moveZ, _invertMoveZ);
 
 _velocity = _dirX * (rawX * _signX)
           + Vector3.up * rawY
           + _dirZ * (rawZ * _signZ);
 ```
 
-`_dirX`, `_dirZ`, `_signX`, `_signZ` son calculados por `RemapAxesFromCamera()` al volver al modo robot, de modo que MoveZ siempre apunta "desde la cámara hacia el efector" independientemente de la orientación del brazo.
+Si el input esta suprimido o el modo camara esta activo, `_velocity` queda en cero y se limpia la UI de acciones articulares.
+
+`RemapAxesFromCamera()` recalcula `_dirX`, `_dirZ`, `_signX` y `_signZ` al volver desde el modo camara para que los ejes horizontales se sientan naturales desde la posicion del operador.
 
 ---
 
-## 2. Cadena velocidad → posición → IK
+## 2. Movimiento cartesiano e IK
 
-**Archivo:** `Assets/Scripts/JoystickAdapter.cs`, método `FixedUpdate()` (L143-178)
+**Archivo:** `Assets/Scripts/JoystickAdapter.cs`
 
-**a) Integración de velocidad a delta de posición:**
+`FixedUpdate()` es el unico lugar donde se genera un objetivo cartesiano para IK.
+
+Si el joystick vuelve a reposo, el controlador no sigue persiguiendo el ultimo objetivo valido. Tambien limpia memoria dinamica y refresca la orientacion fija desde la pose real actual:
+
 ```csharp
-// JoystickAdapter.cs:159-161
-var delta = _velocity * (_speed * Time.fixedDeltaTime);
+if (_velocity.sqrMagnitude < MotionInputEpsilon)
+{
+    EndMotion();
+    return;
+}
+```
+
+Cuando empieza un recorrido nuevo, `BeginMotion()` reinicia las memorias del PID y captura la orientacion actual del TCP antes de calcular IK:
+
+```csharp
+if (!_motionActive)
+    BeginMotion();
+```
+
+Con input activo, el desplazamiento del joystick se calcula en mundo Unity y luego se convierte al frame activo de Flange. La pose objetivo se arma en ese frame para que la orientacion del TCP quede fija respecto del robot, no respecto del mundo:
+
+```csharp
+var deltaWorld = _velocity * (_speed * Time.fixedDeltaTime);
+var deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint);
 var currentPose = _controller.PoseObserver.ToolCenterPointFrame.Value;
 Vector3 currentPos = (Vector3)currentPose.GetColumn(3);
+El controlador traza una trayectoria matemática partiendo del IK previo para evitar que la inercia del PID corrompa la trayectoria (Desacoplamiento de Trayectoria Cartesiana):
+
+```csharp
+Matrix4x4 currentPose;
+if (_hasPrevIkTarget)
+{
+    Matrix4x4 prevWorldPose = _controller.Solver.ComputeForward(new JointTarget(_prevIkTarget), tool);
+    Matrix4x4 frameWorldPose = _controller.GetFrame(frame).GetWorldFrame(_controller, extJoint);
+    currentPose = frameWorldPose.inverse * prevWorldPose;
+}
+else
+{
+    currentPose = _controller.PoseObserver.ToolCenterPointFrame.Value;
+}
 ```
 
-**b) Reconstrucción de `targetPose` (posición + orientación fija):**
-```csharp
-// JoystickAdapter.cs:162
-var targetPose = Matrix4x4.TRS(currentPos + delta, _fixedTcpOrientation, Vector3.one);
-```
-`_fixedTcpOrientation` se captura en `CaptureFixedOrientation()` (L181-185) al inicio y al volver del modo cámara. Garantiza que el TCP no gire mientras se traslada.
+La meta IK es directamente un paso en línea recta desde la meta anterior, manteniendo la orientación constante.
 
-**c) Llamada a IK:**
 ```csharp
-// JoystickAdapter.cs:169-170
+targetPose = Matrix4x4.TRS(
+    currentPos + deltaFrame,
+    _fixedTcpFrameOrientation,
+    Vector3.one);
+```
+
+La solucion IK sigue usando el frame/tool/configuracion actuales de Flange. `targetPose` ya llega expresado en el `frame` activo:
+
+```csharp
+var frame = _controller.Frame.Value;
+var tool = _controller.Tool.Value;
+var configuration = _controller.Configuration.Value;
+var extJoint = _controller.MechanicalGroup.JointState.ExtJoint;
+
 var target = new CartesianTarget(targetPose, configuration, extJoint);
 var solution = _controller.Solver.ComputeInverse(target, tool, frame);
 ```
-`ComputeInverse` pertenece a `Preliy.Flange`. Si `solution.IsValid == false` (singularidad o fuera de workspace) se aborta el tick sin mover los joints (L172-175).
+
+Si `solution.IsValid` es falso, no se aplica `SetJoints()` en ese tick.
+
+Diagnostico opcional:
+
+```csharp
+LogIkPoseError(currentPose, targetPose, solution.JointTarget, tool, frame, extJoint);
+```
+
+Con `_logIkPoseError` activo, se compara `targetPose` contra la FK de `solution.JointTarget` en el mismo frame. Si `poseErr` y `rotErr` son pequenos, la IK esta devolviendo una solucion coherente y el error observable esta despues de IK. Si esos errores son grandes, el problema esta antes o dentro de la resolucion IK/configuracion. El log tambien incluye `targetStep`, `targetRotStep`, `stepScale` y `jointStepLimit`, que indican cuanto salto de posicion/orientacion se le esta pidiendo al target y cuanto se redujo el paso cartesiano.
+
+Para ensayos automaticos, `JoystickAdapter` expone:
+
+```csharp
+SetDiagnosticInputOverride(Vector3 worldVelocity);
+ClearDiagnosticInputOverride();
+LastIkDiagnostic;
+```
+
+Estos hooks no se usan en la operacion normal con joystick. Permiten que un runner de diagnostico inyecte una velocidad cartesiana y lea las mismas metricas de IK/PID sin depender de input fisico.
 
 ---
 
-## 3. Cálculo de inercia simulada
+## 3. Orientacion del TCP
 
-**Archivo:** `Assets/Scripts/RobotDynamics.cs`
+La orientacion del TCP se captura y queda fija mientras se traslada:
 
-**Firma:**
 ```csharp
-// RobotDynamics.cs:44
-public static float[] ComputeEffectiveInertia(IReadOnlyList<TransformJoint> robotJoints)
+_fixedTcpFrameOrientation = _controller.PoseObserver.ToolCenterPointFrame.Value.rotation;
+_orientationCaptured = true;
 ```
 
-- **Input:** lista de los 6 `TransformJoint` de Flange (poses en mundo en tiempo real).  
-- **Output:** `float[6]` — `jEff[i]` en kg·m², calculado como  
-  `J_eff[i] = Σ_{j≥i} m_j · d_ij²`  
-  donde `d_ij` es la distancia perpendicular del eje del joint `i` al CoM del link `j` en coordenadas mundo (RobotDynamics.cs:48-66).
+La orientacion fija se toma directamente desde la pose actual, preservando la rotacion exacta del TCP respecto del robot. La orientacion que se bloquea es una rotacion completa en el frame del robot.
 
-**Datos de masa:** tabla estática `RobotDynamics.Links[]` (RobotDynamics.cs:25-33) con masas URDF del KUKA KR210.
+Eventos que recapturan orientacion:
 
-**Uso en ApplyPID (JoystickAdapter.cs:222-223):**
-```csharp
-float jNorm = Mathf.Max(jEff[i] / _referenceInertia, 0.001f);
-_jointVelocity[i] += (torque / jNorm) * dt;
-```
+| Evento | Accion |
+|---|---|
+| `Start()` | `CaptureFixedOrientation()` |
+| Comienzo de un recorrido | `ResetPIDs()`, `CaptureFixedOrientation()` |
+| Reposo del joystick | `ResetPIDs()`, `CaptureFixedOrientation()` |
+| Volver de modo camara a modo robot | `RemapAxesFromCamera()`, `ResetPIDs()`, `CaptureFixedOrientation()` |
+| Cambio de perfil de input | Sale de modo camara, resetea estado y recaptura orientacion |
 
-**Inspector de JoystickAdapter:**
-| Campo | Variable | Rol |
-|---|---|---|
-| Reference Inertia | `_referenceInertia` (L51) | Denominador de normalización (kg·m²). Con valor = J_eff real → ganancia PID neutra. |
-| Velocity Damping | `_velocityDamping` (L53) | Fricción viscosa (s⁻¹). Evita aceleración indefinida (L226). |
-| Max Joint Velocity | `_maxJointVelocity` (L55) | Clamp de seguridad cinemático (°/s) (L227). |
+No hay una rama especial para movimiento vertical. Si el TCP aparece inclinado durante un desplazamiento vertical, la causa probable no es el input vertical en si, sino alguna combinacion de frame/tool, orientacion TCP esperada, solucion IK equivalente, integral acumulada, o respuesta dinamica de la muneca.
 
 ---
 
-## 4. PID por articulación
+## 4. PID por articulacion
 
-**Archivo:** `Assets/Scripts/JointPID.cs`
+**Archivos:** `Assets/Scripts/JoystickAdapter.cs`, `Assets/Scripts/JointPID.cs`
 
-**Firma de Compute():**
+La salida de IK es un `JointTarget` y se pasa a `ApplyPID(solution.JointTarget)`. La prueba de seguimiento articular directo con `MoveTowardsAngle` empeoro el comportamiento y fue revertida.
+
+El PID calcula un torque virtual en grados/s2 a inercia de referencia.
+
+La derivada trabaja como error de velocidad entre el target IK estimado y la medicion articular:
+
 ```csharp
-// JointPID.cs:32
-public float Compute(float setpoint, float current, float dt)
-```
-- `setpoint`, `current` en grados; `dt` en segundos.  
-- Retorna torque virtual en °/s² (a inercia de referencia).
-
-**Fórmula completa (JointPID.cs:34-38):**
-```csharp
-float error = setpoint - current;
+float error = Mathf.DeltaAngle(current, setpoint);
 _integral = Mathf.Clamp(_integral + error * dt, -MaxIntegral, MaxIntegral);
-float derivative = dt > 1e-6f ? (error - _prevError) / dt : 0f;
-_prevError = error;
+
+float measuredVelocity = _hasPrevCurrent && dt > 1e-6f
+    ? Mathf.DeltaAngle(_prevCurrent, current) / dt
+    : 0f;
+
+float derivative = setpointVelocity - measuredVelocity;
 return Kp * error + Ki * _integral + Kd * derivative;
 ```
 
-**Cadena dinámica en ApplyPID (JoystickAdapter.cs:218-229):**
-```
-torque  = Kp·e + Ki·∫e·dt + Kd·(de/dt)          [JointPID.cs:38]
-accel   = torque / jNorm                          [JoystickAdapter.cs:223]
-vel    += accel * dt  →  -= damping*vel*dt  →  Clamp(±maxVel)
-qNew    = qActual + vel * dt                      [JoystickAdapter.cs:229]
-```
+`setpointVelocity` se estima en `JoystickAdapter` desde la diferencia angular entre el `JointTarget` IK actual y el anterior:
 
-**Anti-windup:** `Mathf.Clamp(_integral, -MaxIntegral, MaxIntegral)` — JointPID.cs:35.  
-Campo Inspector `MaxIntegral` (JointPID.cs:15, default 200 °·s).
-
-**Resets de `_jointVelocity` y PIDs:**
-
-| Evento | Ubicación | Acción |
-|---|---|---|
-| `Start()` | JoystickAdapter.cs:100-108 | `InitPIDs()` crea instancias nuevas (integral=0, prevError=0) |
-| Volver a modo robot (L3) | JoystickAdapter.cs:119 → `ResetPIDs()` L195-203 | `pid.Reset()` en todos + `Array.Clear(_jointVelocity)` |
-| Joystick en reposo | JoystickAdapter.cs:150-151 | `Array.Clear(_jointVelocity)` sin tocar integrales |
-
----
-
-## 5. Aplicación final
-
-**Línea exacta donde se llama SetJoints():**
 ```csharp
-// JoystickAdapter.cs:233
-_controller.MechanicalGroup.SetJoints(new JointTarget(qNew), notify: true);
+float qTargetVelocity = _hasPrevIkTarget && dt > 1e-6f 
+    ? Mathf.DeltaAngle(_prevIkTarget[jointIndex], qTarget) / dt 
+    : 0f;
 ```
 
-`qNew` es un `float[6]` de ángulos articulares en grados, resultado directo de la simulación dinámica (paso 4). Flange interpreta esto como posición articular objetivo y mueve los joints directamente — no recibe fuerzas, torques ni impulsos físicos de Unity. El motor de física de Unity no participa en el movimiento del brazo principal.
+La estimación alimenta tanto al término derivativo como a un cálculo de feedforward estricto que contrarresta matemáticamente el amortiguamiento viscoso. 
+El primer tick despues de `ResetPIDs()`, `BeginMotion()` o una IK invalida usa `qTargetVelocity = 0`, porque todavia no hay target previo confiable.
+
+`Reset()` limpia integral y medicion previa:
+
+```csharp
+_integral = 0f;
+_prevCurrent = 0f;
+_hasPrevCurrent = false;
+```
+
+`ResetPIDs()` tambien limpia `_prevIkTarget` y `_hasPrevIkTarget`, para que el primer tick de un movimiento nuevo no use una velocidad de target stale.
 
 ---
 
-## 6. Scripts NO relacionados con la cadena de control PID/IK
+## 5. Inercia simulada y muneca
 
-### GripperController — `Assets/Scripts/GripperController.cs`
+**Archivo:** `Assets/Scripts/RobotDynamics.cs`
 
-Gestiona la lógica de agarre/suelta del gripper RG2. Completamente independiente:
-- Entrada: `ToggleGrip()` llamado desde `Ctrl_OnRobot_RG2_Custom` (no desde JoystickAdapter).
-- No lee inputs de ejes, no accede a `_controller`, no modifica joints del brazo.
-- Opera sobre `Rigidbody` del gripper y objetos con tag `"Agarrable"`.
-- No interactúa con `JointPID`, `RobotDynamics` ni `SetJoints`.
+`ComputeEffectiveInertia()` estima:
 
-### Ctrl_OnRobot_RG2_Custom — `Assets/Scripts/Ctrl_OnRobot_RG2_Custom.cs`
+```text
+J_eff[i] = sum(j >= i) masa_j * distancia_perpendicular_ij^2
+```
 
-Anima los dedos del gripper (rotación de los brazos R/L_Arm_ID_*). Completamente independiente:
-- Entrada: `_toggleGripAction` (InputActionReference propio, no compartido con JoystickAdapter).
-- Usa su propio `FixedUpdate()` con máquina de estados (ctrl_state 0/1/2).
-- Opera sobre `Rigidbody.MoveRotation()` de las partes del gripper.
-- No accede a `_controller`, no llama `SetJoints`, no interactúa con PID ni IK.
+**Archivo:** `Assets/Scripts/JoystickAdapter.cs`
+
+`ApplyPID()` divide el torque virtual por una inercia normalizada:
+
+```csharp
+float jNorm = Mathf.Max(jEff[i] / _referenceInertia, 0.05f);
+_jointVelocity[i] += (torque / jNorm) * dt;
+```
+
+Se mantiene un piso de inercia mínima del 5% para evitar inestabilidad numérica o multiplicaciones explosivas del control PID cuando `jEff` cae casi a cero en los eslabones livianos de la muñeca.
+
+Despues de integrar aceleracion, se aplica amortiguamiento y limite de velocidad:
+
+```csharp
+_jointVelocity[i] -= _velocityDamping * _jointVelocity[i] * dt;
+_jointVelocity[i] = Mathf.Clamp(_jointVelocity[i], -_maxJointVelocity, _maxJointVelocity);
+qNew[i] = qActual + _jointVelocity[i] * dt;
+```
 
 ---
 
-## Resumen de archivos por rol
+## 6. Resets de estado
 
-| Script | Rol | Relación con cadena PID/IK |
+| Evento | Accion actual |
+|---|---|
+| Modo camara activo | No se mueve el brazo. `_velocity` queda en cero. |
+| Volver a modo robot | Remapea ejes, resetea PIDs/velocidades, recaptura orientacion. |
+| Input suprimido | `_velocity = Vector3.zero`, reset de PIDs/velocidades, UI en cero. |
+| Joystick en reposo | Resetea PIDs/velocidades, recaptura orientacion y retorna. No hay target activo. |
+| Inicio de recorrido | Resetea PIDs/velocidades y captura la orientacion TCP actual antes de IK. |
+| IK invalida | Limpia UI y no aplica nuevos joints en ese tick. |
+
+---
+
+## 7. Scripts no relacionados con la cadena principal
+
+| Script | Rol | Relacion con PID/IK |
 |---|---|---|
-| `JoystickAdapter.cs` | Orquestador principal: input → IK → PID → SetJoints | **Núcleo** |
-| `JointPID.cs` | Controlador PID por articulación | **Núcleo** |
-| `RobotDynamics.cs` | Cálculo de inercia efectiva por articulación | **Núcleo** |
-| `GameManager.cs` | Solo configura targetFPS en Awake | Independiente |
-| `GripperController.cs` | Grab/release de objetos | Independiente |
-| `Ctrl_OnRobot_RG2_Custom.cs` | Animación dedos gripper | Independiente |
+| `GripperController.cs` | Logica de agarre/suelta | Independiente |
+| `Ctrl_OnRobot_RG2_Custom.cs` | Animacion de dedos del gripper | Independiente |
 | `GripperDistanceSensor.cs` | Sensor de distancia del gripper | Independiente |
-| `GripperTopCameraFollow.cs` | Cámara top del gripper | Independiente |
-| `GripperTriggerForwarder.cs` | Reenvía triggers al GripperController | Independiente |
-| `JoystickVibrationHidOutput.cs` | Vibración del joystick PS4 | Independiente |
-| `AxisUIController.cs` | UI de visualización de ejes | Independiente |
-| `JointStatePublisher.cs` | Publicación de estado articular | Independiente |
-| `RobotTest.cs` | Script de prueba | Independiente |
+| `GripperTopCameraFollow.cs` | Camara superior del gripper | Independiente |
+| `GripperTriggerForwarder.cs` | Reenvio de triggers | Independiente |
+| `JoystickVibrationHidOutput.cs` | Vibracion del joystick | Independiente |
+| `AxisUIController.cs` | UI de ejes | Independiente |
+| `JointStatePublisher.cs` | Publicacion de estado articular | Independiente |
+| `RobotTest.cs` | Pruebas/manual | Independiente |
+
+---
+
+## 8. Diagnostico automatico
+
+**Archivos:** `Assets/Scripts/Diagnostics/ControlDiagnosticRunner.cs`, `Assets/Editor/ControlDiagnosticBatch.cs`
+
+`ControlDiagnosticRunner` ejecuta un barrido vertical automatico en Play Mode:
+
+1. Encuentra `JoystickAdapter` y `Controller` en la escena.
+2. Guarda el `JointTarget` inicial.
+3. Captura pose TCP y joints de inicio para medir ida/vuelta.
+4. Inyecta velocidad `Vector3.up` durante 120 ticks.
+5. Deja reposar 20 ticks.
+6. Inyecta velocidad `Vector3.down` durante 120 ticks.
+7. Deja reposar 20 ticks.
+8. Calcula error final respecto del inicio y deriva durante reposos.
+9. Restaura el `JointTarget` inicial.
+10. Escribe un resumen JSON en `Logs/control_vertical_sweep_latest.json`.
+
+Tambien puede ejecutar una matriz de variantes con `RunVerticalSweepMatrix()`. Esa matriz cambia temporalmente parametros privados del `JoystickAdapter` durante Play Mode y los restaura al terminar. Actualmente compara:
+
+- `scene_current`: valores serializados en la escena.
+- `joint_limit_3`: `_ikJointStepLimitMultiplier = 3`.
+- `joint_limit_2`: `_ikJointStepLimitMultiplier = 2`.
+- `joint_limit_1`: `_ikJointStepLimitMultiplier = 1`.
+- `joint_limit_2_maxvel_120`: `_ikJointStepLimitMultiplier = 2`, `_maxJointVelocity = 120`.
+
+El reporte queda en `Logs/control_vertical_sweep_matrix_latest.json` e incluye, por variante, error de orientacion, error articular, `stepScale` y distancia TCP recorrida por segmento. Tambien mide `finalTcpWorldError`, `finalTcpFrameError`, `finalTcpFrameRotationError`, `finalMaxJointRoundTripError`, `maxRestWorldDrift` y `netWorldYDisplacement`. Esto evita aceptar una variante que "mejora" solo porque casi no se mueve o porque baja el error articular pero no vuelve al punto inicial.
+
+Comando batch usado:
+
+```powershell
+& "C:\Program Files\Unity\Hub\Editor\6000.3.11f1\Editor\Unity.exe" `
+  -batchmode `
+  -projectPath . `
+  -executeMethod ControlDiagnosticBatch.RunVerticalSweep `
+  -logFile "Logs/control_vertical_sweep_unity.log"
+```
+
+Para la matriz:
+
+```powershell
+& "C:\Program Files\Unity\Hub\Editor\6000.3.11f1\Editor\Unity.exe" `
+  -batchmode `
+  -projectPath . `
+  -executeMethod ControlDiagnosticBatch.RunVerticalSweepMatrix `
+  -logFile "Logs/control_vertical_sweep_matrix_unity.log"
+```
+
+No usar `-nographics` para este proyecto: URP intenta crear `RenderTexture` y puede fallar con dispositivo grafico nulo. El runner no requiere modificar ni guardar la escena.
