@@ -26,6 +26,8 @@ public class GripperController : MonoBehaviour
 
 	private bool isGripperClosed = true;
 
+	public bool IsHoldingObject => grabbedObject != null;
+
 	private Dictionary<GameObject, int> contactCount = new Dictionary<GameObject, int>();
 	public void ToggleGrip()
 	{
@@ -59,7 +61,10 @@ public class GripperController : MonoBehaviour
 			if (debugTriggers) Debug.Log($"[GripperController] NotifyFingerContact: {obj.name} released, count={contactCount[obj]}");
 		}
 		if (debugTriggers) Debug.Log($"[GripperController] NotifyFingerContact: {obj.name} isTouching={isTouching}, total contacts={contactCount[obj]}");
-		if (isGripperClosed)
+		
+		// Solo intentamos agarrar si la garra está cerrada lógicamente PERO aún no ha llegado a su posición final.
+		// Esto evita el bug de que se peguen objetos cuando la garra ya está completamente cerrada y choca con algo.
+		if (isGripperClosed && gripperAnimator != null && !gripperAnimator.in_position)
 		{
 			TryGrab();
 		}
@@ -78,28 +83,16 @@ public class GripperController : MonoBehaviour
 		}
 	}
 
-	// Public method that child forwarders can call
+	// Public method that child forwarders can call (legacy, no-op)
 	public void NotifyTriggerStay(Collider other)
 	{
-		if (debugTriggers) Debug.Log($"[GripperController] NotifyTriggerStay from {other.name} (tag={other.tag})");
-		CheckAndGrab(other);
+		// Removed to avoid grabbing objects by simply touching them with the outside of the gripper
 	}
 
-	// Keep original behaviour if this script is attached to the same GameObject as the collider
+	// Keep original behaviour if this script is attached to the same GameObject as the collider (legacy, no-op)
 	private void OnTriggerStay(Collider other)
 	{
-		if (debugTriggers) Debug.Log($"[GripperController] OnTriggerStay on {gameObject.name} with {other.name} (tag={other.tag})");
-		CheckAndGrab(other);
-	}
-
-	// Extracted logic used by both OnTriggerStay and NotifyTriggerStay
-	private void CheckAndGrab(Collider other)
-	{
-		if (isGripperClosed && grabbedObject == null && other.CompareTag("Agarrable"))
-		{
-			if (debugTriggers) Debug.Log("[GripperController] Grabbing object " + other.name);
-			GrabObject(other.gameObject);
-		}
+		// Removed to avoid grabbing objects by simply touching them with the outside of the gripper
 	}
 
 	private void GrabObject(GameObject objectToGrab)

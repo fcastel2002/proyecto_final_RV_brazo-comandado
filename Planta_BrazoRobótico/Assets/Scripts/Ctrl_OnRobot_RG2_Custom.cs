@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEditor;
@@ -53,6 +53,13 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 	[SerializeField]
 	private InputActionReference _toggleGripAction;
 
+	[Header("Speeds")]
+	[Tooltip("Velocidad de apertura en mm/s.")]
+	[SerializeField] private float _openSpeed = 180.0f;
+
+	[Tooltip("Velocidad de cerrado en mm/s.")]
+	[SerializeField] private float _closeSpeed = 180.0f;
+
 	[Tooltip("Optional reference to GripperController for grab/release logic.")]
 	[SerializeField]
 	private GripperController _gripperController;
@@ -92,23 +99,55 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 		_inputSuppressed = suppressed;
 	}
 
-	private void OnToggleGrip(InputAction.CallbackContext ctx)
+	private bool _isHolding = false;
+	private float _pressTime = 0f;
+	private bool _homingTriggered = false;
+
+	private void OnToggleGripStarted(InputAction.CallbackContext ctx)
 	{
 		if (_inputSuppressed)
 			return;
+			
+		_isHolding = true;
+		_pressTime = Time.unscaledTime;
+		_homingTriggered = false;
+	}
 
-		// Toggle open ↔ closed.
-		_isOpen = !_isOpen;
-		Debug.Log($"[Gripper] Toggle → _isOpen={_isOpen}, stroke={(_isOpen ? s_max : s_min)}");
-		// Drive the existing stroke/speed logic.
-		stroke = _isOpen ? s_max : s_min;
-		speed = v_max;
-		start_movement = true;
-
-		// Notify the grab/release controller if assigned.
-		if (_gripperController != null)
+	private void OnToggleGripCanceled(InputAction.CallbackContext ctx)
+	{
+		if (_inputSuppressed)
+			return;
+			
+		_isHolding = false;
+		
+		// Si se soltó antes del umbral de hold, fue un clic normal
+		if (!_homingTriggered)
 		{
-			_gripperController.ToggleGrip();
+			_isOpen = !_isOpen;
+			Debug.Log($"[Gripper] Toggle → _isOpen={_isOpen}, stroke={(_isOpen ? s_max : s_min)}");
+			stroke = _isOpen ? s_max : s_min;
+			speed = _isOpen ? _openSpeed : _closeSpeed;
+			start_movement = true;
+
+			if (_gripperController != null)
+			{
+				_gripperController.ToggleGrip();
+			}
+		}
+	}
+
+	private void Update()
+	{
+		if (_isHolding && !_homingTriggered && (Time.unscaledTime - _pressTime >= 1.0f))
+		{
+			_homingTriggered = true;
+			Debug.Log("[Gripper] Hold detected for 1 sec! Triggering J6 Homing.");
+			
+			var joystickAdapter = FindFirstObjectByType<JoystickAdapter>();
+			if (joystickAdapter != null)
+			{
+				joystickAdapter.ResetJ6ToZero();
+			}
 		}
 	}
 
@@ -148,7 +187,7 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 				{
 					// If the values are out of range, clamp them.
 					__stroke = Mathf.Clamp(stroke, s_min, s_max);
-					__speed = Mathf.Clamp(speed, v_min, v_max);
+					__speed = Mathf.Clamp(speed, v_min, Mathf.Max(v_max, _openSpeed, _closeSpeed));
 
 					if (start_movement == true)
 					{
@@ -247,14 +286,22 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 		if (_toggleGripAction == null) return;
 
 		_toggleGripAction.action.Enable();
-		_toggleGripAction.action.performed += OnToggleGrip;
+		_toggleGripAction.action.started += OnToggleGripStarted;
+		_toggleGripAction.action.canceled += OnToggleGripCanceled;
 	}
 
 	private void DisableInputAction()
 	{
 		if (_toggleGripAction == null) return;
 
-		_toggleGripAction.action.performed -= OnToggleGrip;
+		_toggleGripAction.action.started -= OnToggleGripStarted;
+		_toggleGripAction.action.canceled -= OnToggleGripCanceled;
 		_toggleGripAction.action.Disable();
+	}
+
+	private void OnValidate()
+	{
+		_openSpeed = Mathf.Max(0f, _openSpeed);
+		_closeSpeed = Mathf.Max(0f, _closeSpeed);
 	}
 }

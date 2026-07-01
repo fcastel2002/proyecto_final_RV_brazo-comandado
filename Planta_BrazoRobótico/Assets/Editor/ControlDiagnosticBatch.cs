@@ -39,6 +39,28 @@ public static class ControlDiagnosticBatch
         StartRun("matrix");
     }
 
+    [MenuItem("Tools/Control/Run Full Sweep (All Axes) Diagnostic")]
+    public static void RunFullSweepMenu()
+    {
+        RunFullSweep();
+    }
+
+    public static void RunFullSweep()
+    {
+        StartRun("full");
+    }
+
+    [MenuItem("Tools/Control/Run J6 Control Diagnostic")]
+    public static void RunJ6DiagnosticMenu()
+    {
+        RunJ6Diagnostic();
+    }
+
+    public static void RunJ6Diagnostic()
+    {
+        StartRun("j6");
+    }
+
     private static void StartRun(string mode)
     {
         SessionState.SetBool(RunRequestedKey, false);
@@ -73,6 +95,10 @@ public static class ControlDiagnosticBatch
             string mode = SessionState.GetString(RunModeKey, "single");
             if (mode == "matrix")
                 runner.StartCoroutine(runner.RunVerticalSweepMatrix());
+            else if (mode == "full")
+                runner.StartCoroutine(runner.RunFullSweepMatrix());
+            else if (mode == "j6")
+                runner.StartCoroutine(runner.RunJ6Diagnostic());
             else
                 runner.StartCoroutine(runner.RunVerticalSweep());
             return;

@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using Preliy.Flange;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class ControlDiagnosticRunner : MonoBehaviour
 {
@@ -163,6 +164,166 @@ public class ControlDiagnosticRunner : MonoBehaviour
         Completed?.Invoke(0, outputPath);
     }
 
+    public IEnumerator RunJ6Diagnostic()
+    {
+        var adapter = FindFirstObjectByType<JoystickAdapter>();
+        var controller = FindFirstObjectByType<Controller>();
+        var gripper = FindFirstObjectByType<Ctrl_OnRobotRG2_Custom>();
+
+        if (adapter == null || controller == null || !controller.IsValid.Value || gripper == null)
+        {
+            string error = "[ControlDiagnosticRunner] No se encontró JoystickAdapter, Controller o Gripper válido.";
+            Debug.LogError(error, this);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+
+        Debug.Log("[ControlDiagnosticRunner] Iniciando diagnóstico J6...");
+
+        // 1. Inicializar J6 a 0°
+        float[] initialJoints = new float[6];
+        for (int i = 0; i < 6; i++)
+            initialJoints[i] = controller.MechanicalGroup.JointState[i];
+        initialJoints[5] = 0f;
+        controller.MechanicalGroup.SetJoints(new JointTarget(initialJoints), notify: true);
+
+        // Esperar unos frames para que se estabilice
+        for (int i = 0; i < 10; i++)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+
+        float j6Angle = controller.MechanicalGroup.JointState[5];
+        if (Mathf.Abs(j6Angle) > 0.1f)
+        {
+            string error = $"[ControlDiagnosticRunner] Error al inicializar J6 a 0°. Ángulo actual: {j6Angle:F2}°";
+            Debug.LogError(error);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+        Debug.Log("[ControlDiagnosticRunner] J6 inicializado a 0° correctamente.");
+
+        // 2. Activar modo J6 exclusivo
+        JoystickAdapter.SetJ6ExclusiveMode(true);
+        if (!JoystickAdapter.IsJ6ExclusiveMode)
+        {
+            string error = "[ControlDiagnosticRunner] No se pudo activar el modo J6 exclusivo.";
+            Debug.LogError(error);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+
+        // Inyectar entrada de stick para J6
+        adapter.SetDiagnosticInputOverride(new Vector3(0f, 0f, -1f));
+
+        float maxObservedVelocity = 0f;
+        float prevAngle = controller.MechanicalGroup.JointState[5];
+
+        // Monitorear durante 30 fixed updates (0.6 segundos a 50Hz)
+        for (int i = 0; i < 30; i++)
+        {
+            yield return new WaitForFixedUpdate();
+            float currAngle = controller.MechanicalGroup.JointState[5];
+            float velocity = Mathf.Abs(Mathf.DeltaAngle(prevAngle, currAngle)) / Time.fixedDeltaTime;
+            maxObservedVelocity = Mathf.Max(maxObservedVelocity, velocity);
+            prevAngle = currAngle;
+        }
+
+        Debug.Log($"[ControlDiagnosticRunner] Max J6 velocity observed: {maxObservedVelocity:F2}°/s");
+
+        // Assert that velocity does not exceed 90°/s (allowing a tiny margin for discrete stepping)
+        if (maxObservedVelocity > 95f)
+        {
+            string error = $"[ControlDiagnosticRunner] Velocidad de J6 excedió el límite de 90°/s: {maxObservedVelocity:F2}°/s";
+            Debug.LogError(error);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+
+        // 3. Set J6 to 45°
+        adapter.ClearDiagnosticInputOverride();
+        float[] joints45 = new float[6];
+        for (int i = 0; i < 6; i++) joints45[i] = controller.MechanicalGroup.JointState[i];
+        joints45[5] = 45f;
+        controller.MechanicalGroup.SetJoints(new JointTarget(joints45), notify: true);
+
+        // Sync adapter's internal target angles via reflection
+        var targetAngleField = typeof(JoystickAdapter).GetField("_j6TargetAngle", BindingFlags.Instance | BindingFlags.NonPublic);
+        var prevIkTargetField = typeof(JoystickAdapter).GetField("_prevIkTarget", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (targetAngleField != null) targetAngleField.SetValue(adapter, 45f);
+        float[] prevIk = (float[])prevIkTargetField?.GetValue(adapter);
+        if (prevIk != null) prevIk[5] = 45f;
+
+        // Esperar unos frames para estabilizarse en 45°
+        for (int i = 0; i < 10; i++)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+
+        float currentJ6Angle = controller.MechanicalGroup.JointState[5];
+        Debug.Log($"[ControlDiagnosticRunner] J6 establecido a {currentJ6Angle:F2}°");
+
+        // 4. Trigger double-click on the gripper
+        var method = typeof(Ctrl_OnRobotRG2_Custom).GetMethod("OnToggleGrip", BindingFlags.Instance | BindingFlags.NonPublic);
+        if (method == null)
+        {
+            string error = "[ControlDiagnosticRunner] No se encontró el método OnToggleGrip en Ctrl_OnRobotRG2_Custom.";
+            Debug.LogError(error);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+
+        Debug.Log("[ControlDiagnosticRunner] Ejecutando doble clic en el gripper...");
+        method.Invoke(gripper, new object[] { new InputAction.CallbackContext() });
+        
+        // Wait 5 fixed updates (approx 100ms at 50Hz)
+        for (int i = 0; i < 5; i++)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+        
+        method.Invoke(gripper, new object[] { new InputAction.CallbackContext() });
+
+        // Assert that ResettingJ6 becomes true
+        if (!adapter.ResettingJ6)
+        {
+            string error = "[ControlDiagnosticRunner] Error: ResettingJ6 no se activó tras el doble clic.";
+            Debug.LogError(error);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+        Debug.Log("[ControlDiagnosticRunner] ResettingJ6 se activó correctamente.");
+
+        // Esperar a que se complete el reset (timeout de 3 segundos)
+        float timeout = Time.time + 3f;
+        while (adapter.ResettingJ6 && Time.time < timeout)
+        {
+            yield return new WaitForFixedUpdate();
+        }
+
+        if (adapter.ResettingJ6)
+        {
+            string error = "[ControlDiagnosticRunner] Error: El reseteo de J6 no completó dentro de los 3 segundos.";
+            Debug.LogError(error);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+
+        // Assert that J6 is now at 0° (with 0.1° tolerance)
+        float finalJ6Angle = controller.MechanicalGroup.JointState[5];
+        Debug.Log($"[ControlDiagnosticRunner] Ángulo final de J6 tras reseteo: {finalJ6Angle:F4}°");
+        if (Mathf.Abs(finalJ6Angle) > 0.1f)
+        {
+            string error = $"[ControlDiagnosticRunner] Error: J6 no regresó a 0°. Ángulo final: {finalJ6Angle:F4}°";
+            Debug.LogError(error);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+
+        Debug.Log("[ControlDiagnosticRunner] Diagnóstico de J6 completado con ÉXITO.");
+        Completed?.Invoke(0, "Diagnóstico de J6 completado con ÉXITO.");
+    }
+
     public IEnumerator RunVerticalSweepMatrix(float inputMagnitude = 1f, int settleTicks = 20, int segmentTicks = 120)
     {
         var adapter = FindFirstObjectByType<JoystickAdapter>();
@@ -232,6 +393,84 @@ public class ControlDiagnosticRunner : MonoBehaviour
         Completed?.Invoke(0, outputPath);
     }
 
+    /// <summary>
+    /// Barrido completo: Y (vertical), X (lateral), Z (profundidad) y diagonal XZ.
+    /// Cada dirección sube/avanza, pausa, baja/retrocede, pausa.
+    /// </summary>
+    public IEnumerator RunFullSweepMatrix(float inputMagnitude = 1f, int settleTicks = 20, int segmentTicks = 120)
+    {
+        var adapter = FindFirstObjectByType<JoystickAdapter>();
+        var controller = FindFirstObjectByType<Controller>();
+
+        if (adapter == null || controller == null || !controller.IsValid.Value)
+        {
+            string error = "[ControlDiagnosticRunner] No se encontro JoystickAdapter o Controller valido.";
+            Debug.LogError(error, this);
+            Completed?.Invoke(1, error);
+            yield break;
+        }
+
+        var initialTarget = CopyJointTarget(controller.MechanicalGroup.JointState);
+
+        var matrix = new MatrixSummary
+        {
+            startedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+            sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().path,
+            fixedDeltaTime = Time.fixedDeltaTime,
+            inputMagnitude = inputMagnitude,
+            settleTicks = settleTicks,
+            segmentTicks = segmentTicks
+        };
+
+        // Direcciones a probar: Y, X, Z, diagonal XZ
+        var directions = new[]
+        {
+            ("sweep_Y",  Vector3.up,                              Vector3.down),
+            ("sweep_X",  Vector3.right * inputMagnitude,          Vector3.left * inputMagnitude),
+            ("sweep_Z",  Vector3.forward * inputMagnitude,        Vector3.back * inputMagnitude),
+            ("sweep_XZ", (Vector3.right + Vector3.forward).normalized * inputMagnitude,
+                         (Vector3.left + Vector3.back).normalized * inputMagnitude),
+        };
+
+        foreach (var (dirName, forward, backward) in directions)
+        {
+            // Restaurar posición inicial para cada dirección
+            controller.MechanicalGroup.SetJoints(initialTarget, notify: true);
+            adapter.ClearDiagnosticInputOverride();
+
+            for (int i = 0; i < settleTicks; i++)
+            {
+                adapter.SetDiagnosticInputOverride(Vector3.zero);
+                yield return new WaitForFixedUpdate();
+            }
+
+            var startWorldPose = GetTcpWorldPose(controller);
+            var startFramePose = GetTcpFramePose(controller);
+            var startJointTarget = CopyJointTarget(controller.MechanicalGroup.JointState);
+            var summary = CreateRunSummary(adapter, dirName, inputMagnitude, settleTicks, segmentTicks);
+
+            yield return RunDirectionalSegments(adapter, controller, summary, forward, backward, settleTicks, segmentTicks);
+            FillRoundTripMetrics(summary, controller, startWorldPose, startFramePose, startJointTarget);
+            matrix.runs.Add(summary);
+        }
+
+        adapter.ClearDiagnosticInputOverride();
+        controller.MechanicalGroup.SetJoints(initialTarget, notify: true);
+
+        string outputPath = WriteFullSweepSummary(matrix);
+        Debug.Log(BuildMatrixConsoleSummary(matrix, outputPath), this);
+        Completed?.Invoke(0, outputPath);
+    }
+
+    private IEnumerator RunDirectionalSegments(JoystickAdapter adapter, Controller controller, RunSummary summary,
+        Vector3 forward, Vector3 backward, int settleTicks, int segmentTicks)
+    {
+        yield return RunSegment(adapter, controller, summary, "avanzar", forward, segmentTicks);
+        yield return RunSegment(adapter, controller, summary, "reposo_1", Vector3.zero, settleTicks);
+        yield return RunSegment(adapter, controller, summary, "retroceder", backward, segmentTicks);
+        yield return RunSegment(adapter, controller, summary, "reposo_2", Vector3.zero, settleTicks);
+    }
+
     private IEnumerator RunSweepSegments(JoystickAdapter adapter, Controller controller, RunSummary summary, float inputMagnitude, int settleTicks, int segmentTicks)
     {
         yield return RunSegment(adapter, controller, summary, "subir", Vector3.up * inputMagnitude, segmentTicks);
@@ -297,6 +536,21 @@ public class ControlDiagnosticRunner : MonoBehaviour
         string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
         string timestampPath = Path.Combine(logsDir, $"control_vertical_sweep_matrix_{timestamp}.json");
         string latestPath = Path.Combine(logsDir, "control_vertical_sweep_matrix_latest.json");
+
+        File.WriteAllText(timestampPath, json);
+        File.WriteAllText(latestPath, json);
+        return latestPath;
+    }
+
+    private static string WriteFullSweepSummary(MatrixSummary summary)
+    {
+        string logsDir = Path.Combine(Application.dataPath, "..", "Logs");
+        Directory.CreateDirectory(logsDir);
+
+        string json = JsonUtility.ToJson(summary, prettyPrint: true);
+        string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture);
+        string timestampPath = Path.Combine(logsDir, $"control_full_sweep_{timestamp}.json");
+        string latestPath = Path.Combine(logsDir, "control_full_sweep_latest.json");
 
         File.WriteAllText(timestampPath, json);
         File.WriteAllText(latestPath, json);

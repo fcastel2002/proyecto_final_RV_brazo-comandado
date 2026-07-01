@@ -5,6 +5,7 @@ public class GripperDistanceSensor : MonoBehaviour
 {
     [Header("Sensor")]
     [SerializeField] private Transform sensorOrigin;
+    [SerializeField] private Vector3 raycastOffset = Vector3.zero;
     [SerializeField] private Vector3 localDirection = Vector3.down;
     [SerializeField] private float maxDistance = 1.0f;
     [SerializeField] private float sphereRadius = 0.015f;
@@ -23,6 +24,7 @@ public class GripperDistanceSensor : MonoBehaviour
 
     [Header("Joystick vibration")]
     [SerializeField] private JoystickVibrationHidOutput joystickVibration;
+    [SerializeField] private GripperController gripperController;
     [SerializeField] private bool autoFindJoystickVibration = true;
     [SerializeField] private bool vibrateOnProximity = true;
     [SerializeField] private float vibrationStartDistance = 0.15f;
@@ -46,6 +48,12 @@ public class GripperDistanceSensor : MonoBehaviour
     {
         if (joystickVibration == null && autoFindJoystickVibration)
             joystickVibration = FindFirstObjectByType<JoystickVibrationHidOutput>();
+
+        if (gripperController == null)
+            gripperController = FindFirstObjectByType<GripperController>();
+
+        vibrationStartDistance = safeGripMaxDistance;
+        vibrationStopDistance = Mathf.Max(vibrationStartDistance, vibrationStopDistance);
     }
 
     private void Update()
@@ -66,9 +74,10 @@ public class GripperDistanceSensor : MonoBehaviour
     {
         Transform origin = Origin;
         Vector3 direction = origin.TransformDirection(localDirection.normalized);
+        Vector3 startPoint = origin.position + origin.TransformDirection(raycastOffset);
 
         HasHit = Physics.SphereCast(
-            origin.position,
+            startPoint,
             sphereRadius,
             direction,
             out RaycastHit hit,
@@ -119,6 +128,13 @@ public class GripperDistanceSensor : MonoBehaviour
             return;
         }
 
+        // Si ya tenemos un objeto agarrado, no debemos vibrar
+        if (gripperController != null && gripperController.IsHoldingObject)
+        {
+            SetProximityVibration(false);
+            return;
+        }
+
         float threshold = IsVibratingForProximity
             ? vibrationStopDistance
             : vibrationStartDistance;
@@ -141,7 +157,8 @@ public class GripperDistanceSensor : MonoBehaviour
         sphereRadius = Mathf.Max(0f, sphereRadius);
         safeGripMinDistance = Mathf.Max(0f, safeGripMinDistance);
         safeGripMaxDistance = Mathf.Max(safeGripMinDistance, safeGripMaxDistance);
-        vibrationStartDistance = Mathf.Max(0f, vibrationStartDistance);
+        
+        vibrationStartDistance = safeGripMaxDistance;
         vibrationStopDistance = Mathf.Max(vibrationStartDistance, vibrationStopDistance);
     }
 
@@ -152,7 +169,7 @@ public class GripperDistanceSensor : MonoBehaviour
         Transform origin = Origin;
         if (origin == null) return;
 
-        Vector3 start = origin.position;
+        Vector3 start = origin.position + origin.TransformDirection(raycastOffset);
         Vector3 direction = origin.TransformDirection(localDirection.normalized);
         Vector3 end = start + direction * maxDistance;
 

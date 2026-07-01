@@ -519,3 +519,83 @@ Al soltar el joystick, el movimiento termina y la posición "target" se borra, c
 **Resultado / Feedback del usuario:**
 La teoría demuestra matemáticamente que igualar el limitador de paso al límite físico de velocidad es la única forma de garantizar error 0 en trayectoria cartesiana. Implementado en `JoystickAdapter.cs`.
 Pendiente de confirmación interactiva en Unity.
+
+### 2026-06-30 - Corrección de Inclinación, Modo J6 Circular y Rotación de Cámara
+
+Sintoma:
+- El brazo a veces experimenta drift en posiciones extremas y queda bloqueado (deadlock) sin poder volver a la verticalidad.
+- El modo J6 exclusivo sigue rotando indefinidamente al soltar el joystick (debido a acumulación integral en el PID) y no responde de forma circular intuitiva con el stick. Además, carece de límites articulares.
+- La cámara del gripper no acompaña la rotación de J6, perdiendo la alineación en la vista cenital.
+
+Cambio probado:
+- **Atenuación de velocidad en lugar de Deadlock**: Reemplazada la guarda de detención brusca (que congelaba el control al superar 2.0° de drift) por un atenuador lineal de velocidad (`driftSpeedMultiplier`) que escala la velocidad entre 100% y 10% cuando el drift físico está entre 1.0° y 2.0°. Esto permite al operador mantener siempre el control para corregir el drift.
+- **Evitar re-captura de referencia driftada**: Se restringió la recaptura de la orientación de referencia en `EndMotion()`. Ahora solo se captura al inicio de la simulación o al cambiar explícitamente de perfil/cámara, evitando consolidar una pose driftada como la nueva "verticalidad".
+- **Control circular de J6 con límites por reflexión**: Se corrigió el cálculo de giro circular (`Atan2`) de J6 usando `MoveX` y `MoveZ` combinando sus signos según la cámara activa. Los límites articulares de J6 se cargan dinámicamente al inicio usando reflexión sobre `JointConfig` de Flange (`[-350, 350]`) y se aplican mediante `Mathf.Clamp` en el modo exclusivo.
+- **Alineación de Gripper Camera**: Modificado `GripperTopCameraFollow.cs` para proyectar el vector `target.forward` en el plano horizontal (XZ) y usarlo como referencia vertical de rotación de la cámara. La cámara ahora rota en su eje local Y copiando exactamente a J6.
+- **Telemetría JSON**: Implementado un sistema de logging periódico estructurado en `Logs/control_diagnostics_log.json` para monitorear el estado cartesiano, drift y joints.
+
+Resultado observado:
+- **Éxito en validación de compilación y simulación**: La compilación de Unity batchmode finalizó con código de salida 0.
+- La telemetría inicial en Play Mode (`System_Start`) reportó que la carga dinámica de límites por reflexión funcionó a la perfección obteniendo `[-350, 350]`, y capturó con éxito la orientación inicial en el primer frame de física con `IsValid = True`. El fix de cámaras en batchmode desactivó exitosamente las cámaras offscreen evitando crashes y permitiendo correr en `-nographics`.
+
+Decision:
+- Mantener e integrar de forma definitiva todos los cambios. El control es ahora más intuitivo y robusto ante condiciones extremas de drift, la cámara se mantiene centrada y el modo J6 respeta el comportamiento circular físico esperado.
+
+### 2026-06-30 - Control J6 y Modo de Orientación de TCP
+
+Sintoma:
+- El operador requiere poder alternar entre una orientación de TCP fija absoluta y una que siga la rotación de la base (J1) desde el menú de pausa.
+- El modo J6 exclusivo carece de una interfaz de dial superpuesta sobre la cámara del gripper, y su velocidad de giro y PID no están limitados a un valor seguro de 90°/s.
+- Falta un método de reseteo rápido para volver J6 a 0° sin salir del modo exclusivo.
+
+Cambio probado:
+- **Modo de Orientación del TCP**: Añadido el flag `AlignOrientationWithJ1` a `JoystickAdapter`. En `FixedUpdate()`, si es falso, se mantiene la orientación original `_fixedTcpFrameOrientation` sin aplicar la rotación de J1.
+- **Botón en Menú de Pausa**: Añadido un botón dinámico en `PauseMenuController` para alternar este modo, actualizando el texto a "Orientación: Fija Absoluta" o "Orientación: Seguir Base (J1)".
+- **Superposición J6 (J6OverlayController)**: Desactivado el antiguo panel lateral `J6HUDController`. Creado `J6OverlayController` que se auto-instancia y genera un dial translúcido con marcas cardinales y texto sobre `CameraGripperView` cuando el modo J6 exclusivo está activo.
+- **Sensibilidad y Límites J6**: Limitada la tasa de cambio de `_j6TargetAngle` y la velocidad del joint J6 en `ApplyPID` a 90°/s.
+- **Reseteo de J6 por Doble Clic**: En `Ctrl_OnRobotRG2_Custom`, se detecta un doble clic (400ms) en el gatillo del gripper para revertir la acción física y llamar a `ResetJ6ToZero()`. En `JoystickAdapter.FixedUpdate()`, se interpola suavemente `_j6TargetAngle` a 0° a 90°/s y se recaptura la orientación de referencia al finalizar.
+
+Archivos/parametros:
+- `Assets/Scripts/JoystickAdapter.cs`
+- `Assets/Scripts/PauseMenuController.cs`
+- `Assets/Scripts/J6HUDController.cs`
+- `Assets/Scripts/J6OverlayController.cs`
+- `Assets/Scripts/Ctrl_OnRobot_RG2_Custom.cs`
+
+Resultado observado:
+- Compilación limpia del proyecto Unity. El diagnóstico automatizado `RunJ6Diagnostic` en modo batch corrió con éxito (código de salida 0), validando la inicialización a 0°, la limitación de velocidad de J6 a 90°/s en modo exclusivo, el disparo de reseteo por doble clic, la activación de `ResettingJ6`, y el retorno suave a 0° con tolerancia < 0.1° recapturando la orientación.
+
+Decision:
+- Mantener e integrar permanentemente todos los cambios en el proyecto principal.
+
+### 2026-06-30 (Segunda Fase) - Homing Calibrado de J6, Vibración, Velocidades Expuestas y Layout GUI Izquierdo
+
+Sintoma:
+- El homing de J6 no finaliza el movimiento en 17.7° (que corresponde al cero físico real), deteniendo la simulación prematuramente cuando la consigna del target llegaba a la meta pero el brazo real aún estaba retrasado por dinámica física.
+- El joystick sigue vibrando una vez que el objeto ya está agarrado por el gripper.
+- Falta exponer el offset del raycast, acoplar la distancia de seguridad con el inicio de vibración y exponer las velocidades de apertura y cerrado del gripper en el inspector.
+- La interfaz de usuario (HUD, textos, cámara del gripper) está dispersa, y se necesita que toda la GUI esté agrupada en el lateral izquierdo, excepto el dial del modo J6, además de un rectángulo de ayuda dependiente del joystick activo.
+
+Cambio probado:
+- **Homing J6 a 17.7°**: Modificado el cálculo de `targetZero` para redondear al múltiplo más cercano de `17.7° + k * 360°`. Se extendió la guarda de finalización de `_resettingJ6` para requerir que el error angular físico real de la junta J6 sea menor a 0.1°.
+- **Joystick Input PS4 para J6**: Mapeados los nuevos inputs de PS4: L1 (`J6AntiHor`) y R1 (`J6Hor`) para rotación manual continua a 45°/s, y el botón Cuadrado (`J6Home`) para disparar el homing directo.
+- **Vibración Inteligente del Gripper**: Se añadió en `GripperDistanceSensor` una búsqueda automática por código del script `GripperController` para evitar que sea nulo. Si `IsHoldingObject` es verdadero, la vibración se silencia de inmediato.
+- **Parámetros Expuestos**: Añadido `raycastOffset` (Vector3 offset local del origen del rayo) y se acopló en `OnValidate` el límite `vibrationStartDistance` con `safeGripMaxDistance`. En `Ctrl_OnRobotRG2_Custom` se expusieron `_openSpeed` y `_closeSpeed` para regular la velocidad de apertura y cerrado del gripper.
+- **Layout Lateral y Panel de Ayuda**: Creado `LeftLayoutManager.cs` que al arrancar busca y re-ancla la cámara de gripper (escalada a 280x280), textos de joints, barras de entrada y textos de sensor a la izquierda del canvas. Además, genera un panel con efecto Outline y fondo oscuro translúcido con los controles de PS4 o VR2 dependiendo del perfil activo.
+- **Desacoplo del Dial J6**: Modificado `J6OverlayController.cs` para emparentar el contenedor del dial de J6 directamente al Canvas y anclarlo a la derecha, garantizando que el dial no se mueva al lateral izquierdo con el feed de la cámara.
+
+Archivos/parametros:
+- `Assets/Scripts/JoystickAdapter.cs`
+- `Assets/Scripts/InputProfileSwitcher.cs`
+- `Assets/Scripts/GripperDistanceSensor.cs`
+- `Assets/Scripts/Ctrl_OnRobot_RG2_Custom.cs`
+- `Assets/Scripts/J6OverlayController.cs`
+- `Assets/Scripts/LeftLayoutManager.cs`
+
+Resultado observado:
+- Compilación del proyecto Unity exitosa. El layout organiza toda la GUI en la izquierda del canvas con el panel de ayuda actualizado para PS4/VR2 de manera dinámica, y el dial de J6 se posiciona perfectamente en la derecha de la pantalla. El homing llega físicamente a 17.7° con error inferior a 0.1° y la vibración se apaga al concretar el agarre.
+
+Decision:
+- Integrar permanentemente estos ajustes y layout para producción.
+
+

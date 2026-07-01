@@ -45,12 +45,27 @@ JoystickAdapter.FixedUpdate()
         |      CaptureFixedOrientation()
         |      return
         |
-        |  si empieza un nuevo recorrido:
-        |      ResetPIDs()
-        |      CaptureFixedOrientation()
-        |
-        |  deltaWorld = _velocity * _speed * fixedDeltaTime
-        |  deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint)
+        if (_velocity.sqrMagnitude < MotionInputEpsilon)
+    {
+        EndMotion();
+        return;
+    }
+
+    // Guarda de orientación física:
+    // Verifica la orientación física del TCP contra la esperada.
+    // Si el drift supera 1.0°, la velocidad de la trayectoria se atenúa linealmente
+    // hasta un mínimo del 10% (a partir de 2.0°). Esto permite al operador
+    // corregir la desviación y salir de posiciones extremas sin congelar el brazo.
+    float driftSpeedMultiplier = 1.0f;
+    if (physicalRotDrift > 1.0f)
+    {
+        driftSpeedMultiplier = Mathf.Lerp(1.0f, 0.1f, (physicalRotDrift - 1.0f) / (physicalOrientationTolerance - 1.0f));
+        driftSpeedMultiplier = Mathf.Max(driftSpeedMultiplier, 0.1f);
+    }
+
+    // Avanza trayectoria matemática y resuelve IK
+    deltaWorld = _velocity * _speed * fixedDeltaTime
+    |  deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint)
         |  currentPose = solucion IK anterior o ToolCenterPointFrame
         |  targetPose = TRS(currentPos + deltaFrame, _fixedTcpFrameOrientation, one)
         v
@@ -85,6 +100,9 @@ Flange recibe posiciones articulares. Unity Physics no aplica torques ni fuerzas
 | `_moveY` | Movimiento vertical en mundo (`Vector3.up`). |
 | `_moveZ` | Movimiento frontal remapeado respecto de la vista del operador. |
 | `_modoCamara` | Toggle entre modo robot y modo camara. |
+| `_j6AntiHorAction` | Rotación manual J6 anti-horaria (L1). |
+| `_j6HorAction` | Rotación manual J6 horaria (R1). |
+| `_j6HomeAction` | Disparador de Homing J6 a 17.7° (Cuadrado). |
 | `_calibrationManager` | Lee ejes calibrados si esta disponible. |
 
 `Update()` solo arma una velocidad cartesiana. No integra posicion y no llama IK.
@@ -205,17 +223,22 @@ _orientationCaptured = true;
 
 La orientacion fija se toma directamente desde la pose actual, preservando la rotacion exacta del TCP respecto del robot. La orientacion que se bloquea es una rotacion completa en el frame del robot.
 
-Eventos que recapturan orientacion:
+Hay dos modos de orientación disponibles mediante la propiedad `AlignOrientationWithJ1`:
+- **Orientación Fija Absoluta (`AlignOrientationWithJ1 = false`)**: La orientación del TCP permanece exactamente constante en el frame del robot (`_fixedTcpFrameOrientation`), sin importar el giro de la base (J1).
+- **Orientación Seguir Base (`AlignOrientationWithJ1 = true`)**: La orientación del TCP rota dinámicamente según la variación angular de la base J1 (`j1Rotation * _fixedTcpFrameOrientation`).
+
+Para evitar condiciones de carrera en el arranque (donde el controlador de Flange puede tardar unos frames en ser válido), `FixedUpdate` intentará capturar la orientación en cuanto `_controller.IsValid.Value` sea `true` por primera vez.
+
+Eventos que capturan orientacion:
 
 | Evento | Accion |
 |---|---|
-| `Start()` | `CaptureFixedOrientation()` |
-| Comienzo de un recorrido | `ResetPIDs()`, `CaptureFixedOrientation()` |
-| Reposo del joystick | `ResetPIDs()`, `CaptureFixedOrientation()` |
+| Inicialización (Play Mode / Inicio) | `CaptureFixedOrientation()` en cuanto el controlador se vuelve válido. |
 | Volver de modo camara a modo robot | `RemapAxesFromCamera()`, `ResetPIDs()`, `CaptureFixedOrientation()` |
 | Cambio de perfil de input | Sale de modo camara, resetea estado y recaptura orientacion |
 
-No hay una rama especial para movimiento vertical. Si el TCP aparece inclinado durante un desplazamiento vertical, la causa probable no es el input vertical en si, sino alguna combinacion de frame/tool, orientacion TCP esperada, solucion IK equivalente, integral acumulada, o respuesta dinamica de la muneca.
+> [!NOTE]
+> Al soltar el joystick o detenerse (`EndMotion()`), **no** se recaptura la orientación actual del TCP si esta está desviada física o matemáticamente, previniendo la acumulación de drift de referencia. La orientación de referencia se mantiene inalterada durante todo el recorrido del brazo cartesiano.
 
 ---
 
@@ -302,18 +325,18 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 | Modo camara activo | No se mueve el brazo. `_velocity` queda en cero. |
 | Volver a modo robot | Remapea ejes, resetea PIDs/velocidades, recaptura orientacion. |
 | Input suprimido | `_velocity = Vector3.zero`, reset de PIDs/velocidades, UI en cero. |
-| Joystick en reposo | Resetea PIDs/velocidades, recaptura orientacion y retorna. No hay target activo. |
+| Joystick en reposo | Resetea PIDs/velocidades, recaptura orientacion y retorna. No hay target activo (salvo si `_resettingJ6` está activo). |
 | Inicio de recorrido | Resetea PIDs/velocidades y captura la orientacion TCP actual antes de IK. |
 | IK invalida | Limpia UI y no aplica nuevos joints en ese tick. |
+| Doble clic en gripper / Cuadrado PS4 | Activa el reseteo suave de J6 al cero físico real de 17.7° (`_resettingJ6 = true`). |
+| Finalización de reseteo J6 | Cuando J6 y el robot físico alcanzan los 17.7° (error < 0.1°), se limpia `_resettingJ6` y se recaptura la orientación TCP de referencia. |
 
 ---
-
-## 7. Scripts no relacionados con la cadena principal
 
 | Script | Rol | Relacion con PID/IK |
 |---|---|---|
 | `GripperController.cs` | Logica de agarre/suelta | Independiente |
-| `Ctrl_OnRobot_RG2_Custom.cs` | Animacion de dedos del gripper | Independiente |
+| `Ctrl_OnRobot_RG2_Custom.cs` | Animacion de dedos del gripper y detección de doble clic para resetear J6 | Llama a `ResetJ6ToZero()` en doble clic |
 | `GripperDistanceSensor.cs` | Sensor de distancia del gripper | Independiente |
 | `GripperTopCameraFollow.cs` | Camara superior del gripper | Independiente |
 | `GripperTriggerForwarder.cs` | Reenvio de triggers | Independiente |
@@ -321,6 +344,8 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 | `AxisUIController.cs` | UI de ejes | Independiente |
 | `JointStatePublisher.cs` | Publicacion de estado articular | Independiente |
 | `RobotTest.cs` | Pruebas/manual | Independiente |
+| `J6OverlayController.cs` | Dibuja un dial superpuesto en Canvas (derecha) cuando el modo J6 exclusivo está activo | UI de J6 Exclusivo |
+| `LeftLayoutManager.cs` | Agrupa dinámicamente toda la GUI en la izquierda y dibuja el panel de ayuda de controles | UI General |
 
 ---
 

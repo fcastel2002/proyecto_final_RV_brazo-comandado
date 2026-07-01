@@ -19,6 +19,8 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI activeProfileText;
     [SerializeField] private TextMeshProUGUI calibrationStatusText;
     [SerializeField] private GameObject futureOptionsContainer;
+    [SerializeField] private Button orientationModeButton;
+    [SerializeField] private JoystickAdapter joystickAdapter;
 
     [Header("Menu Colors")]
     [SerializeField] private Color overlayColor = new Color(0f, 0f, 0f, 0.55f);
@@ -61,6 +63,66 @@ public class PauseMenuController : MonoBehaviour
     private Vector2Int _heldNavigationDirection;
     private float _nextNavigationAt;
 
+    private void EnsureOrientationButtonExists()
+    {
+        if (orientationModeButton != null) return;
+
+        Transform panel = pauseMenuRoot.transform.Find("Panel");
+        if (panel == null)
+        {
+            panel = pauseMenuRoot.GetComponentInChildren<VerticalLayoutGroup>()?.transform;
+        }
+
+        if (panel != null)
+        {
+            Transform existing = panel.Find("OrientationButton");
+            if (existing != null)
+            {
+                orientationModeButton = existing.GetComponent<Button>();
+            }
+            else
+            {
+                orientationModeButton = CreateButton("Orientación: Fija Absoluta", panel);
+                orientationModeButton.gameObject.name = "OrientationButton";
+                
+                if (continueButton != null)
+                {
+                    orientationModeButton.transform.SetSiblingIndex(continueButton.transform.GetSiblingIndex());
+                }
+            }
+        }
+    }
+
+    public void ToggleOrientationMode()
+    {
+        if (joystickAdapter == null)
+            joystickAdapter = FindFirstObjectByType<JoystickAdapter>();
+
+        if (joystickAdapter != null)
+        {
+            joystickAdapter.AlignOrientationWithJ1 = !joystickAdapter.AlignOrientationWithJ1;
+            UpdateOrientationButtonText();
+        }
+    }
+
+    private void UpdateOrientationButtonText()
+    {
+        if (orientationModeButton == null) return;
+        var text = orientationModeButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (text != null)
+        {
+            if (joystickAdapter == null)
+                joystickAdapter = FindFirstObjectByType<JoystickAdapter>();
+
+            if (joystickAdapter != null)
+            {
+                text.text = joystickAdapter.AlignOrientationWithJ1 
+                    ? "Orientación: Seguir Base (J1)" 
+                    : "Orientación: Fija Absoluta";
+            }
+        }
+    }
+
     private void Awake()
     {
         if (inputProfileSwitcher == null)
@@ -70,7 +132,13 @@ public class PauseMenuController : MonoBehaviour
             calibrationManager = FindFirstObjectByType<AnalogCalibrationManager>();
 
         if (pauseMenuRoot == null)
+        {
             BuildDefaultMenu();
+        }
+        else
+        {
+            EnsureOrientationButtonExists();
+        }
 
         WireButtons();
         ApplyButtonColors();
@@ -345,6 +413,9 @@ public class PauseMenuController : MonoBehaviour
 
         if (resetCalibrationButton != null)
             resetCalibrationButton.onClick.AddListener(ResetCalibration);
+
+        if (orientationModeButton != null)
+            orientationModeButton.onClick.AddListener(ToggleOrientationMode);
     }
 
     private void OnActiveProfileChanged(InputProfileSwitcher.InputProfileKind profile)
@@ -390,6 +461,10 @@ public class PauseMenuController : MonoBehaviour
                 || calibrationStatusText.text == CalibrationUnavailableForPs4Status)
                 SetCalibrationStatus($"Calibracion lista para {inputProfileSwitcher.GetDisplayName(activeProfile)}");
         }
+
+        if (joystickAdapter == null)
+            joystickAdapter = FindFirstObjectByType<JoystickAdapter>();
+        UpdateOrientationButtonText();
 
         if (EventSystem.current != null)
         {
@@ -485,6 +560,7 @@ public class PauseMenuController : MonoBehaviour
             calibrateButton,
             finishCalibrationButton,
             resetCalibrationButton,
+            orientationModeButton,
             continueButton
         };
 
@@ -647,7 +723,7 @@ public class PauseMenuController : MonoBehaviour
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
         panelRect.pivot = new Vector2(0.5f, 0.5f);
         panelRect.anchoredPosition = Vector2.zero;
-        panelRect.sizeDelta = new Vector2(460f, 500f);
+        panelRect.sizeDelta = new Vector2(460f, 560f);
 
         var panelImage = panel.AddComponent<Image>();
         panelImage.color = panelColor;
@@ -694,6 +770,9 @@ public class PauseMenuController : MonoBehaviour
         calibrateButton = CreateButton("Calibrar analogicos", futureOptionsContainer.transform);
         finishCalibrationButton = CreateButton("Finalizar calibracion", futureOptionsContainer.transform);
         resetCalibrationButton = CreateButton("Restablecer calibracion", futureOptionsContainer.transform);
+
+        orientationModeButton = CreateButton("Orientación: Fija Absoluta", panel.transform);
+        orientationModeButton.gameObject.name = "OrientationButton";
 
         continueButton = CreateButton("Continuar", panel.transform);
     }
@@ -754,6 +833,7 @@ public class PauseMenuController : MonoBehaviour
         ApplyButtonColors(calibrateButton);
         ApplyButtonColors(finishCalibrationButton);
         ApplyButtonColors(resetCalibrationButton);
+        ApplyButtonColors(orientationModeButton);
         RefreshSelectedTextColors();
     }
 
@@ -786,6 +866,7 @@ public class PauseMenuController : MonoBehaviour
         SetButtonTextColor(calibrateButton, selected);
         SetButtonTextColor(finishCalibrationButton, selected);
         SetButtonTextColor(resetCalibrationButton, selected);
+        SetButtonTextColor(orientationModeButton, selected);
     }
 
     private void SetButtonTextColor(Button button, GameObject selected)

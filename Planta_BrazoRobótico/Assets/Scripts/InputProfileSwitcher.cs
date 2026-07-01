@@ -111,7 +111,10 @@ public class InputProfileSwitcher : MonoBehaviour
             actions.MoveY,
             actions.MoveZ,
             null,
-            actions.CameraModeAllowed);
+            actions.CameraModeAllowed,
+            actions.J6AntiHor,
+            actions.J6Hor,
+            actions.J6Home);
 
         cameraController?.ApplyInputActions(
             actions.CameraModeAllowed ? actions.MoveForward : null,
@@ -247,6 +250,9 @@ public class InputProfileSwitcher : MonoBehaviour
                 ViewUp = Resolve(ps4JoystickAsset, "PS4Joystick", "ViewUp"),
                 ViewSide = Resolve(ps4JoystickAsset, "PS4Joystick", "ViewSide"),
                 Gripper = Resolve(ps4JoystickAsset, "PS4Joystick", "Gripper"),
+                J6AntiHor = Resolve(ps4JoystickAsset, "PS4Joystick", "J6AntiHor"),
+                J6Hor = Resolve(ps4JoystickAsset, "PS4Joystick", "J6Hor"),
+                J6Home = Resolve(ps4JoystickAsset, "PS4Joystick", "J6Home"),
                 CameraModeAllowed = true
             };
 
@@ -259,17 +265,20 @@ public class InputProfileSwitcher : MonoBehaviour
             return false;
         }
 
-        actions = new ResolvedProfile
-        {
-            MoveX = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover X"),
-            MoveY = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Y"),
-            MoveZ = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Z"),
-            CameraToggle = Resolve(robotBasicAsset, "Basico Cartesiano", "Camera Toggle"),
-            MoveForward = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover X"),
-            MoveSide = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Z"),
-            Gripper = Resolve(robotBasicAsset, "Basico Cartesiano", "Gripper"),
-            CameraModeAllowed = true
-        };
+            actions = new ResolvedProfile
+            {
+                MoveX = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover X"),
+                MoveY = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Y"),
+                MoveZ = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Z"),
+                CameraToggle = Resolve(robotBasicAsset, "Basico Cartesiano", "Camera Toggle"),
+                MoveForward = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover X"),
+                MoveSide = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Z"),
+                Gripper = Resolve(robotBasicAsset, "Basico Cartesiano", "Gripper"),
+                J6AntiHor = null,
+                J6Hor = null,
+                J6Home = null,
+                CameraModeAllowed = true
+            };
 
         return HasRequiredRobotActions(actions, "VR-2");
     }
@@ -542,6 +551,9 @@ public class InputProfileSwitcher : MonoBehaviour
         public InputActionReference ViewUp;
         public InputActionReference ViewSide;
         public InputActionReference Gripper;
+        public InputActionReference J6AntiHor;
+        public InputActionReference J6Hor;
+        public InputActionReference J6Home;
         public bool CameraModeAllowed;
     }
 

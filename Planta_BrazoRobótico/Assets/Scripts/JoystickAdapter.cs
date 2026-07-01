@@ -37,6 +37,11 @@ public class JoystickAdapter : MonoBehaviour
     [SerializeField] private InputActionReference _moveY;
     [SerializeField] private InputActionReference _moveZ;
 
+    [Header("Input Actions - J6")]
+    [SerializeField] private InputActionReference _j6AntiHorAction;
+    [SerializeField] private InputActionReference _j6HorAction;
+    [SerializeField] private InputActionReference _j6HomeAction;
+
     [Header("Axis Direction")]
     [SerializeField] private bool _invertMoveX;
     [SerializeField] private bool _invertMoveY;
@@ -81,8 +86,48 @@ public class JoystickAdapter : MonoBehaviour
     [SerializeField] private bool _logIkPoseError = true;
     [SerializeField, Min(0.02f)] private float _ikPoseLogInterval = 0.5f;
 
+    [Header("J6 Limits")]
+    [SerializeField] private float _j6MinLimit = -360f;
+    [SerializeField] private float _j6MaxLimit = 360f;
+
+    [Header("TCP Orientation Mode")]
+    public bool AlignOrientationWithJ1 = false;
+
     /// <summary>true = modo camara activo, false = modo robot activo.</summary>
     public static bool IsCameraMode { get; private set; }
+    public static bool IsJ6ExclusiveMode { get; private set; }
+
+    private bool _resettingJ6 = false;
+    public bool ResettingJ6 => _resettingJ6;
+
+    public void ResetJ6ToZero()
+    {
+        _resettingJ6 = true;
+        Debug.Log("[JoystickAdapter] Reset J6 to 0° started.");
+    }
+
+    public static void SetJ6ExclusiveMode(bool active)
+    {
+        IsJ6ExclusiveMode = active;
+        var adapter = FindFirstObjectByType<JoystickAdapter>();
+        if (adapter != null)
+        {
+            if (active)
+            {
+                if (adapter._controller != null && adapter._controller.IsValid.Value)
+                {
+                    adapter._j6TargetAngle = adapter._hasPrevIkTarget ? adapter._prevIkTarget[5] : adapter._controller.MechanicalGroup.JointState[5];
+                    adapter._hasUnwrappedStickAngle = false;
+                }
+            }
+            else
+            {
+                adapter._velocity = Vector3.zero;
+                adapter._orientationCaptured = false;
+                adapter.CaptureFixedOrientation();
+            }
+        }
+    }
 
     public IkDiagnosticSample LastIkDiagnostic { get; private set; }
 
@@ -99,6 +144,7 @@ public class JoystickAdapter : MonoBehaviour
     private float[] _jointVelocity = new float[6];
     private readonly float[] _prevIkTarget = new float[6];
     private Quaternion _fixedTcpFrameOrientation;
+    private float _initialJ1Angle;
     private bool _orientationCaptured;
     private bool _motionActive;
     private bool _hasPrevIkTarget;
@@ -106,6 +152,16 @@ public class JoystickAdapter : MonoBehaviour
     private bool _diagnosticInputOverrideActive;
     private Vector3 _diagnosticInputOverrideVelocity;
     private float _nextIkPoseLogTime;
+    private float _lastCameraClickTime;
+    private float _doubleClickDeadline;
+    private bool _waitingForDoubleClick;
+    private float _j6TargetAngle;
+    private string _jsonLogPath;
+    private float _nextJsonLogTime;
+    private readonly float[] _minLimits = new float[6];
+    private readonly float[] _maxLimits = new float[6];
+    private float _prevStickAngle;
+    private bool _hasUnwrappedStickAngle;
     private readonly float[] _lastJointControlActions = new float[6];
 
     public float[] LastJointControlActions => _lastJointControlActions;
@@ -114,6 +170,21 @@ public class JoystickAdapter : MonoBehaviour
     {
         if (_calibrationManager == null)
             _calibrationManager = FindFirstObjectByType<AnalogCalibrationManager>();
+
+        if (Application.isBatchMode)
+        {
+            // Desactivar solo las cámaras offscreen (con targetTexture) para evitar crashes en modo -nographics
+            // manteniendo la cámara principal activa para que el PlayerLoop no se congele.
+            Camera[] cameras = FindObjectsByType<Camera>(FindObjectsSortMode.None);
+            foreach (Camera cam in cameras)
+            {
+                if (cam.targetTexture != null)
+                {
+                    cam.enabled = false;
+                    Debug.Log($"[JoystickAdapter] Cámara offscreen '{cam.name}' desactivada para evitar crashes en modo batch.");
+                }
+            }
+        }
     }
 
     private void OnEnable()
@@ -131,7 +202,10 @@ public class JoystickAdapter : MonoBehaviour
         InputActionReference moveY,
         InputActionReference moveZ,
         InputActionReference modoCamara,
-        bool cameraModeAllowed)
+        bool cameraModeAllowed,
+        InputActionReference j6AntiHor = null,
+        InputActionReference j6Hor = null,
+        InputActionReference j6Home = null)
     {
         DisableInputActions();
 
@@ -140,6 +214,9 @@ public class JoystickAdapter : MonoBehaviour
         _moveZ = moveZ;
         _modoCamara = modoCamara;
         _cameraModeAllowed = cameraModeAllowed;
+        _j6AntiHorAction = j6AntiHor;
+        _j6HorAction = j6Hor;
+        _j6HomeAction = j6Home;
 
         ExitCameraModeForProfileChange();
         ResetInputState();
@@ -154,14 +231,141 @@ public class JoystickAdapter : MonoBehaviour
             InitDefaultMapping();
 
         InitPIDs();
+        TryLoadJointLimitsDynamic();
+        
+        // Inicializar ruta del log de diagnóstico JSON
+        string logsDir = Application.dataPath + "/../Logs";
+        if (!System.IO.Directory.Exists(logsDir))
+        {
+            System.IO.Directory.CreateDirectory(logsDir);
+        }
+        _jsonLogPath = logsDir + "/control_diagnostics_log.json";
+        
         CaptureFixedOrientation();
         ClearJointActionDisplay();
+        
+        // Registrar inicio del sistema de diagnóstico
+        LogDiagnosticJson("System_Start", "Sistema de control y diagnosticos estructurados inicializado exitosamente.");
+    }
+
+    private void TryLoadJointLimitsDynamic()
+    {
+        // Inicializar con valores por defecto seguros por si falla la reflexión
+        for (int i = 0; i < 6; i++)
+        {
+            _minLimits[i] = -360f;
+            _maxLimits[i] = 360f;
+        }
+        
+        // J6 conserva sus campos serializados para compatibilidad
+        _minLimits[5] = _j6MinLimit;
+        _maxLimits[5] = _j6MaxLimit;
+
+        try
+        {
+            if (_controller != null && _controller.MechanicalGroup != null && _controller.MechanicalGroup.RobotJoints != null)
+            {
+                int count = Mathf.Min(6, _controller.MechanicalGroup.RobotJoints.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    var joint = _controller.MechanicalGroup.RobotJoints[i];
+                    var configField = joint.GetType().GetField("_config", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (configField != null)
+                    {
+                        var config = configField.GetValue(joint);
+                        if (config != null)
+                        {
+                            var limitsProp = config.GetType().GetProperty("Limits", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                            if (limitsProp != null)
+                            {
+                                Vector2 limits = (Vector2)limitsProp.GetValue(config);
+                                _minLimits[i] = limits.x;
+                                _maxLimits[i] = limits.y;
+                                Debug.Log($"[JoystickAdapter] Límites J{i+1} cargados dinámicamente: [{_minLimits[i]}, {_maxLimits[i]}]");
+                            }
+                        }
+                    }
+                }
+                
+                // Sincronizar campos antiguos de J6 para compatibilidad
+                _j6MinLimit = _minLimits[5];
+                _j6MaxLimit = _maxLimits[5];
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[JoystickAdapter] No se pudieron cargar los límites dinámicamente por reflexión: {e.Message}. Usando valores por defecto.");
+        }
+    }
+
+    private void LogDiagnosticJson(string eventType, string message, float driftVal = 0f, float speedMult = 1f)
+    {
+        if (string.IsNullOrEmpty(_jsonLogPath)) return;
+        if (Time.time < _nextJsonLogTime) return;
+        _nextJsonLogTime = Time.time + 0.1f; // Limitar a 10 Hz máximo para evitar I/O bottleneck
+
+        try
+        {
+            float[] joints = new float[6];
+            if (_controller != null && _controller.IsValid.Value)
+            {
+                for (int i = 0; i < 6; i++)
+                    joints[i] = _controller.MechanicalGroup.JointState[i];
+            }
+
+            string jointsJson = $"[{joints[0]:F2},{joints[1]:F2},{joints[2]:F2},{joints[3]:F2},{joints[4]:F2},{joints[5]:F2}]";
+            Vector3 tcpPos = Vector3.zero;
+            if (_controller != null && _controller.IsValid.Value)
+            {
+                tcpPos = (Vector3)_controller.PoseObserver.ToolCenterPointFrame.Value.GetColumn(3);
+            }
+            string tcpJson = $"[{tcpPos.x:F4},{tcpPos.y:F4},{tcpPos.z:F4}]";
+
+            string jsonLine = $"{{\"time\":{Time.time:F3},\"event\":\"{eventType}\",\"msg\":\"{message}\",\"drift\":{driftVal:F3},\"speedMult\":{speedMult:F3},\"tcp\":{tcpJson},\"joints\":{jointsJson}}}";
+            
+            System.IO.File.AppendAllText(_jsonLogPath, jsonLine + "\n");
+        }
+        catch (System.Exception e)
+        {
+            // Failsafe silencioso para no interrumpir el hilo principal si falla la escritura en disco
+            Debug.LogWarning($"[JoystickAdapter] Falló la escritura del log JSON: {e.Message}");
+        }
     }
 
     public void ToggleCameraMode()
     {
         if (!_cameraModeAllowed)
             return;
+
+        float currentTime = Time.unscaledTime;
+        float delta = currentTime - _lastCameraClickTime;
+        _lastCameraClickTime = currentTime;
+
+        if (_waitingForDoubleClick)
+        {
+            // Segundo clic llegó dentro de la ventana: activar/desactivar modo J6
+            _waitingForDoubleClick = false;
+            SetJ6ExclusiveMode(!IsJ6ExclusiveMode);
+            Debug.Log($"[JoystickAdapter] Modo J6 Exclusivo: {IsJ6ExclusiveMode}");
+            return;
+        }
+
+        // Primer clic: NO cambiamos la cámara todavía, esperamos a ver si viene un segundo clic
+        _waitingForDoubleClick = true;
+        _doubleClickDeadline = currentTime + 0.4f; // 400ms de ventana
+    }
+
+    /// <summary>
+    /// Llamar desde Update() para procesar el timeout del doble clic.
+    /// Si la ventana expira sin segundo clic, ejecutamos el toggle de cámara normal.
+    /// </summary>
+    private void ProcessDoubleClickTimeout()
+    {
+        if (!_waitingForDoubleClick) return;
+        if (Time.unscaledTime < _doubleClickDeadline) return;
+
+        // Expiró la ventana: ejecutar toggle de cámara normal
+        _waitingForDoubleClick = false;
 
         bool wasCameraMode = IsCameraMode;
         IsCameraMode = !IsCameraMode;
@@ -213,6 +417,13 @@ public class JoystickAdapter : MonoBehaviour
 
     private void Update()
     {
+        ProcessDoubleClickTimeout();
+
+        if (_j6HomeAction != null && _j6HomeAction.action.WasPressedThisFrame())
+        {
+            ResetJ6ToZero();
+        }
+
         if (_inputSuppressed)
         {
             _velocity = Vector3.zero;
@@ -224,6 +435,12 @@ public class JoystickAdapter : MonoBehaviour
         {
             _velocity = Vector3.zero;
             ClearJointActionDisplay();
+            return;
+        }
+
+        if (IsJ6ExclusiveMode)
+        {
+            _velocity = Vector3.zero;
             return;
         }
 
@@ -242,12 +459,46 @@ public class JoystickAdapter : MonoBehaviour
                   + _dirZ * (rawZ * _signZ);
     }
 
+    private int _fixedUpdateCount = 0;
+
     private void FixedUpdate()
     {
+        _fixedUpdateCount++;
+        if (Application.isBatchMode && (_fixedUpdateCount < 10 || _fixedUpdateCount % 20 == 0))
+        {
+            Debug.Log($"[JoystickAdapter][Debug] FixedUpdate #{_fixedUpdateCount}: IsValid={(_controller != null ? _controller.IsValid.Value.ToString() : "null")}, Velocity={_velocity.magnitude:F3}, MotionActive={_motionActive}, OrientationCaptured={_orientationCaptured}");
+        }
+
         if (IsCameraMode) return;
         if (_controller == null || !_controller.IsValid.Value) return;
 
-        if (_velocity.sqrMagnitude < MotionInputEpsilon)
+        float dt = Time.fixedDeltaTime;
+
+        if (_resettingJ6)
+        {
+            // Encontrar el múltiplo de 360 más cercano para volver a la posición cero física más cercana (con offset de 17.7°)
+            float targetZero = Mathf.Round((_j6TargetAngle - 17.7f) / 360f) * 360f + 17.7f;
+            targetZero = Mathf.Clamp(targetZero, _j6MinLimit, _j6MaxLimit);
+            
+            _j6TargetAngle = Mathf.MoveTowards(_j6TargetAngle, targetZero, 90f * dt);
+            float currentJ6 = (_controller != null && _controller.IsValid.Value) ? _controller.MechanicalGroup.JointState[5] : 0f;
+            if (Mathf.Approximately(_j6TargetAngle, targetZero) && Mathf.Abs(Mathf.DeltaAngle(currentJ6, targetZero)) < 0.1f)
+            {
+                _j6TargetAngle = targetZero;
+                _resettingJ6 = false;
+                _orientationCaptured = false;
+                CaptureFixedOrientation();
+                Debug.Log($"[JoystickAdapter] Reset J6 to {targetZero}° completed. Recaptured orientation.");
+            }
+        }
+
+        if (IsJ6ExclusiveMode)
+        {
+            UpdateJ6ExclusiveControl();
+            return;
+        }
+
+        if (_velocity.sqrMagnitude < MotionInputEpsilon && !_resettingJ6)
         {
             EndMotion();
             return;
@@ -256,15 +507,62 @@ public class JoystickAdapter : MonoBehaviour
         if (!_motionActive)
             BeginMotion();
 
-        if (!_orientationCaptured) return;
+        if (!_orientationCaptured)
+        {
+            CaptureFixedOrientation();
+            if (!_orientationCaptured) return;
+        }
 
         var frame = _controller.Frame.Value;
         var tool = _controller.Tool.Value;
         var configuration = _controller.Configuration.Value;
         var extJoint = _controller.MechanicalGroup.JointState.ExtJoint;
 
-        float dt = Time.fixedDeltaTime;
-        var deltaWorld = _velocity * (_speed * dt);
+        // ── Guarda de orientación física ──────────────────────────────────
+        // Verificamos la orientación REAL del robot (no la matemática).
+        // Calculamos la orientación esperada girando la referencia fija
+        // según cuánto haya rotado la base (J1). En la convención DH de Flange,
+        // los joints giran sobre el -Y del padre, así que usamos Vector3.down
+        Quaternion dynamicTcpOrientation;
+        if (AlignOrientationWithJ1)
+        {
+            float currentJ1 = _hasPrevIkTarget ? _prevIkTarget[0] : _controller.MechanicalGroup.JointState[0];
+            float deltaJ1 = currentJ1 - _initialJ1Angle;
+            Quaternion j1Rotation = Quaternion.AngleAxis(deltaJ1, Vector3.down);
+            dynamicTcpOrientation = j1Rotation * _fixedTcpFrameOrientation;
+        }
+        else
+        {
+            dynamicTcpOrientation = _fixedTcpFrameOrientation;
+        }
+
+        const float physicalOrientationTolerance = 2.0f; // grados
+        Quaternion actualTcpOrientation = _controller.PoseObserver.ToolCenterPointFrame.Value.rotation;
+        float physicalRotDrift = Quaternion.Angle(dynamicTcpOrientation, actualTcpOrientation);
+
+        float driftSpeedMultiplier = 1f;
+        if (physicalRotDrift > 1.0f)
+        {
+            // Escalar linealmente la velocidad entre 1.0° (100% velocidad) y 2.0° (10% velocidad)
+            driftSpeedMultiplier = Mathf.Lerp(1.0f, 0.1f, (physicalRotDrift - 1.0f) / (physicalOrientationTolerance - 1.0f));
+            driftSpeedMultiplier = Mathf.Max(driftSpeedMultiplier, 0.1f);
+            
+            if (physicalRotDrift > physicalOrientationTolerance)
+            {
+                if (_logIkPoseError && Time.time >= _nextIkPoseLogTime)
+                {
+                    _nextIkPoseLogTime = Time.time + Mathf.Max(_ikPoseLogInterval, 0.02f);
+                    Debug.LogWarning(
+                        $"[JoystickAdapter][Orientación] Desviación de orientación física detectada: " +
+                        $"{physicalRotDrift:F2}deg > {physicalOrientationTolerance}deg. Velocidad reducida al {driftSpeedMultiplier * 100f:F0}%.");
+                }
+                
+                LogDiagnosticJson("OrientationDrift", $"Drift de orientacion detectado: {physicalRotDrift:F2}deg. Velocidad reducida.", physicalRotDrift, driftSpeedMultiplier);
+            }
+        }
+
+        // ── Cálculo de trayectoria ───────────────────────────────────────
+        var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier);
         var deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint);
         
         Matrix4x4 currentPose;
@@ -281,10 +579,11 @@ public class JoystickAdapter : MonoBehaviour
         
         Vector3 currentPos = (Vector3)currentPose.GetColumn(3);
 
-        Matrix4x4 targetPose = Matrix4x4.TRS(currentPos + deltaFrame, _fixedTcpFrameOrientation, Vector3.one);
+        Matrix4x4 targetPose = Matrix4x4.TRS(currentPos + deltaFrame, dynamicTcpOrientation, Vector3.one);
         var target = new CartesianTarget(targetPose, configuration, extJoint);
         var solution = _controller.Solver.ComputeInverse(target, tool, frame);
 
+        // ── Validación IK ────────────────────────────────────────────────
         JointTarget ikTarget = null;
         bool targetAccepted = false;
 
@@ -292,22 +591,24 @@ public class JoystickAdapter : MonoBehaviour
         {
             ikTarget = solution.JointTarget;
             
-            // Verificamos si la IK sacrificó la orientación para llegar a la posición extrema
+            // Verificamos si la IK sacrificó la orientación para llegar a la posición extrema.
+            // Comparamos la FK del resultado IK contra nuestra orientación dinámica esperada,
+            // NO contra el targetPose (que siempre la incluye), para máxima robustez.
             Matrix4x4 solvedWorldPose = _controller.Solver.ComputeForward(ikTarget, tool);
             Matrix4x4 solvedFramePose = _controller.WorldToFrame(solvedWorldPose, frame, extJoint);
-            float rotError = Quaternion.Angle(targetPose.rotation, solvedFramePose.rotation);
+            float rotError = Quaternion.Angle(dynamicTcpOrientation, solvedFramePose.rotation);
             
             // Tolerancia estricta para asegurar comportamiento de Pick & Place puro
             if (rotError <= 0.5f)
             {
-                // Verificamos que no haya un salto abrupto de configuración (ej. Wrist flip o Singularity)
+                // Verificamos que no haya un salto abrupto de configuración (ej. Wrist flip)
                 bool configJump = false;
                 if (_hasPrevIkTarget)
                 {
                     for (int i = 0; i < 6; i++)
                     {
                         float jump = Mathf.Abs(Mathf.DeltaAngle(_prevIkTarget[i], ikTarget[i]));
-                        if (jump > 15f) // Si salta más de 15 grados en 1 frame (0.02s) es un flip
+                        if (jump > 15f)
                         {
                             configJump = true;
                             break;
@@ -327,32 +628,43 @@ public class JoystickAdapter : MonoBehaviour
                         _nextIkPoseLogTime = Time.time + Mathf.Max(_ikPoseLogInterval, 0.02f);
                         Debug.LogWarning($"[JoystickAdapter][IK] Target rechazado por salto de configuración (IK Flip).");
                     }
+                    LogDiagnosticJson("IkRejected_ConfigJump", "Salto abrupto de configuracion detectado (IK Flip).", 0f, driftSpeedMultiplier);
                 }
             }
             else
             {
-                // Registramos el rechazo si el log está activo
                 if (_logIkPoseError && Time.time >= _nextIkPoseLogTime)
                 {
                     _nextIkPoseLogTime = Time.time + Mathf.Max(_ikPoseLogInterval, 0.02f);
                     Debug.LogWarning($"[JoystickAdapter][IK] Target rechazado por límite de orientación. Error: {rotError:F2}deg > 0.5deg");
                 }
+                LogDiagnosticJson("IkRejected_OrientationLimit", $"Límite de orientacion excedido: {rotError:F2}deg > 0.5deg", rotError, driftSpeedMultiplier);
             }
+        }
+        else
+        {
+            if (_logIkPoseError && Time.time >= _nextIkPoseLogTime)
+            {
+                _nextIkPoseLogTime = Time.time + Mathf.Max(_ikPoseLogInterval, 0.02f);
+                Debug.LogWarning($"[JoystickAdapter][IK] Target rechazado: Solución IK no válida (fuera del espacio de trabajo).");
+            }
+            LogDiagnosticJson("IkInvalid_OutOfWorkspace", "La pose objetivo esta fuera del espacio de trabajo del robot.", 0f, driftSpeedMultiplier);
         }
 
         if (!targetAccepted)
         {
             if (!_hasPrevIkTarget)
             {
-                // Si nunca tuvimos un target válido en este movimiento, abortamos
                 ClearJointActionDisplay();
                 return;
             }
             
             // Mantenemos la última consigna válida para que el brazo la alcance y se detenga
-            // sin resetear el target, lo que causaría saltos o congelamientos
             ikTarget = new JointTarget(_prevIkTarget);
         }
+
+        // Registrar telemetría periódica de movimiento cartesiano
+        LogDiagnosticJson("Telemetry_Cartesian", $"Movimiento cartesiano activo. Error orientacion: {physicalRotDrift:F3}deg", physicalRotDrift, driftSpeedMultiplier);
 
         ApplyPID(ikTarget, dt);
     }
@@ -363,6 +675,7 @@ public class JoystickAdapter : MonoBehaviour
         if (_orientationCaptured) return;
         
         _fixedTcpFrameOrientation = _controller.PoseObserver.ToolCenterPointFrame.Value.rotation;
+        _initialJ1Angle = _controller.MechanicalGroup.JointState[0];
         _orientationCaptured = true;
     }
 
@@ -423,6 +736,112 @@ public class JoystickAdapter : MonoBehaviour
             this);
     }
 
+    private void UpdateJ6ExclusiveControl()
+    {
+        float currentJ6 = (_controller != null && _controller.IsValid.Value) ? _controller.MechanicalGroup.JointState[5] : 0f;
+
+        if (!_resettingJ6)
+        {
+            // 1. Verificar botones de rotación J6 primero
+            float buttonInput = 0f;
+            if (_j6AntiHorAction != null && _j6AntiHorAction.action.ReadValue<float>() > 0.5f)
+                buttonInput -= 1f;
+            if (_j6HorAction != null && _j6HorAction.action.ReadValue<float>() > 0.5f)
+                buttonInput += 1f;
+
+            if (Mathf.Abs(buttonInput) > 0.1f)
+            {
+                // Rotar J6 a velocidad constante (45°/s)
+                _j6TargetAngle += buttonInput * 45f * Time.fixedDeltaTime;
+                _j6TargetAngle = Mathf.Clamp(_j6TargetAngle, _j6MinLimit, _j6MaxLimit);
+                _hasUnwrappedStickAngle = false;
+            }
+            else
+            {
+                // 2. Si no hay botones, usar el analógico
+                // MoveX = leftStick horizontal, MoveZ = leftStick vertical (mismo analógico)
+                Vector2 input;
+                if (_diagnosticInputOverrideActive)
+                {
+                    input = new Vector2(_diagnosticInputOverrideVelocity.x, _diagnosticInputOverrideVelocity.z);
+                }
+                else
+                {
+                    // Ignoramos _signX y _signZ en modo J6 porque la cámara del gripper siempre está alineada.
+                    float rawX = ReadAxis(_moveX, _invertMoveX);
+                    float rawZ = ReadAxis(_moveZ, _invertMoveZ);
+                    input = new Vector2(rawX, rawZ);
+                }
+
+                if (input.sqrMagnitude > 0.04f) // Deadzone de 0.2
+                {
+                    // Atan2(y, x) -> Aquí pasamos (x, z) para que 0° sea adelante y crezca en sentido horario
+                    float angle = Mathf.Atan2(input.x, input.y) * Mathf.Rad2Deg;
+                    
+                    if (!_hasUnwrappedStickAngle)
+                    {
+                        _prevStickAngle = angle;
+                        _hasUnwrappedStickAngle = true;
+                        // _j6TargetAngle ya está inicializado correctamente (e.g. desde currentJ6)
+                    }
+                    else
+                    {
+                        float deltaStick = Mathf.DeltaAngle(_prevStickAngle, angle);
+                        _prevStickAngle = angle;
+                        
+                        // Limitar deltaStick para robustez extrema (evita fallos al cruzar la zona muerta)
+                        deltaStick = Mathf.Clamp(deltaStick, -90f, 90f);
+                        
+                        // Gear ratio 1:4 e inversión del giro (negativo)
+                        float targetDelta = -deltaStick * 0.25f;
+                        _j6TargetAngle += targetDelta;
+                    }
+                    
+                    // Asignación absoluta limitada por los límites físicos de J6
+                    _j6TargetAngle = Mathf.Clamp(_j6TargetAngle, _j6MinLimit, _j6MaxLimit);
+                    
+                    if (Mathf.Approximately(_j6TargetAngle, _j6MinLimit) || Mathf.Approximately(_j6TargetAngle, _j6MaxLimit))
+                    {
+                        LogDiagnosticJson("J6_LimitReached", $"Se alcanzo el limite articular de J6: {_j6TargetAngle:F1}deg", _j6TargetAngle);
+                    }
+                }
+                else
+                {
+                    // Si el analógico vuelve al centro y no hay botones, frenamos en la posición actual
+                    // y reseteamos el PID/velocidad de J6 para frenar en seco.
+                    if (_controller != null && _controller.IsValid.Value)
+                    {
+                        _j6TargetAngle = currentJ6;
+                        _prevIkTarget[5] = currentJ6;
+                        _pids[5].Reset();
+                        _jointVelocity[5] = 0f;
+                        _hasUnwrappedStickAngle = false;
+                    }
+                }
+            }
+        }
+
+        // Generar un nuevo JointTarget usando la posición de las articulaciones actuales
+        // (o previas) pero sobreescribiendo el índice 5 (J6).
+        float[] joints = new float[6];
+        for (int i = 0; i < 6; i++)
+        {
+            joints[i] = _hasPrevIkTarget ? _prevIkTarget[i] : _controller.MechanicalGroup.JointState[i];
+        }
+        joints[5] = _j6TargetAngle;
+
+        // IMPORTANTE: NO hacemos joints.CopyTo(_prevIkTarget) aquí.
+        // Dejamos que ApplyPID lo haga al final de su ejecución para que pueda
+        // calcular correctamente qTargetVelocity y aplicar el torque feedforward.
+
+        // Registrar telemetría del modo J6 exclusivo
+        float j6Drift = Mathf.Abs(Mathf.DeltaAngle(currentJ6, _j6TargetAngle));
+        LogDiagnosticJson("Telemetry_J6Exclusive", $"Modo J6 activo. Target: {_j6TargetAngle:F1}deg, Actual: {currentJ6:F1}deg, Entrada: {(_diagnosticInputOverrideActive ? _diagnosticInputOverrideVelocity.magnitude : 0f):F2}", j6Drift, 1f);
+
+        float dt = Time.fixedDeltaTime;
+        ApplyPID(new JointTarget(joints), dt);
+    }
+
     private void BeginMotion()
     {
         ResetPIDs();
@@ -453,6 +872,10 @@ public class JoystickAdapter : MonoBehaviour
         _moveZ?.action.Enable();
 
         _modoCamara?.action.Enable();
+
+        _j6AntiHorAction?.action.Enable();
+        _j6HorAction?.action.Enable();
+        _j6HomeAction?.action.Enable();
     }
 
     private void DisableInputActions()
@@ -462,6 +885,10 @@ public class JoystickAdapter : MonoBehaviour
         _moveZ?.action.Disable();
 
         _modoCamara?.action.Disable();
+
+        _j6AntiHorAction?.action.Disable();
+        _j6HorAction?.action.Disable();
+        _j6HomeAction?.action.Disable();
     }
 
     private void ExitCameraModeForProfileChange()
@@ -513,6 +940,10 @@ public class JoystickAdapter : MonoBehaviour
         for (int i = 0; i < 6; i++)
         {
             float qTarget = ikTarget[i];
+            if (_resettingJ6 && i == 5)
+            {
+                qTarget = _j6TargetAngle;
+            }
             float qActual = _controller.MechanicalGroup.JointState[i];
             
             // Calculamos la velocidad deseada para compensar perfectamente el amortiguamiento
@@ -538,9 +969,26 @@ public class JoystickAdapter : MonoBehaviour
 
             // Amortiguamiento viscoso: evita aceleración indefinida
             _jointVelocity[i] -= _velocityDamping * _jointVelocity[i] * dt;
-            _jointVelocity[i] = Mathf.Clamp(_jointVelocity[i], -_maxJointVelocity, _maxJointVelocity);
+            
+            float maxVel = (i == 5 && IsJ6ExclusiveMode) ? 45f : _maxJointVelocity;
+            _jointVelocity[i] = Mathf.Clamp(_jointVelocity[i], -maxVel, maxVel);
 
-            qNew[i] = qActual + _jointVelocity[i] * dt;
+            float targetQNew = qActual + _jointVelocity[i] * dt;
+            qNew[i] = Mathf.Clamp(targetQNew, _minLimits[i], _maxLimits[i]);
+
+            // Si se golpea un límite articular físico, frenamos la velocidad acumulada
+            // en esa dirección y reseteamos el término integral del PID para evitar windup
+            if (Mathf.Approximately(qNew[i], _minLimits[i]) && _jointVelocity[i] < 0f)
+            {
+                _jointVelocity[i] = 0f;
+                _pids[i].Reset();
+            }
+            else if (Mathf.Approximately(qNew[i], _maxLimits[i]) && _jointVelocity[i] > 0f)
+            {
+                _jointVelocity[i] = 0f;
+                _pids[i].Reset();
+            }
+
             _prevIkTarget[i] = qTarget;
         }
 

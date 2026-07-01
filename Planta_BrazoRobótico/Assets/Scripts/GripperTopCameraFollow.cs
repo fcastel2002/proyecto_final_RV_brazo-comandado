@@ -17,6 +17,19 @@ public class GripperTopCameraFollow : MonoBehaviour
             Time.deltaTime * positionSmooth
         );
 
-        transform.rotation = Quaternion.LookRotation(Vector3.down, Vector3.forward);
+        // Proyectar el vector forward del efector en el plano horizontal para usarlo como 'up' de la cámara
+        Vector3 targetForward = target.forward;
+        targetForward.y = 0f;
+        
+        if (targetForward.sqrMagnitude < 1e-6f)
+        {
+            targetForward = target.up;
+            targetForward.y = 0f;
+        }
+
+        Vector3 cameraUp = targetForward.sqrMagnitude > 1e-6f ? targetForward.normalized : Vector3.forward;
+        
+        // La cámara siempre mira hacia abajo (LookRotation(down, up)) pero rota con J6
+        transform.rotation = Quaternion.LookRotation(Vector3.down, cameraUp);
     }
 }
