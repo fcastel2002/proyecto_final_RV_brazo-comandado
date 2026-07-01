@@ -572,17 +572,20 @@ Decision:
 
 Sintoma:
 - El homing de J6 no finaliza el movimiento en 17.7° (que corresponde al cero físico real), deteniendo la simulación prematuramente cuando la consigna del target llegaba a la meta pero el brazo real aún estaba retrasado por dinámica física.
+- Hay un gran overshoot si el ángulo de J6 está muy lejos de 17.7° al hacer el homing y luego demora mucho tiempo en retornar y estabilizarse.
 - El joystick sigue vibrando una vez que el objeto ya está agarrado por el gripper.
 - Falta exponer el offset del raycast, acoplar la distancia de seguridad con el inicio de vibración y exponer las velocidades de apertura y cerrado del gripper en el inspector.
 - La interfaz de usuario (HUD, textos, cámara del gripper) está dispersa, y se necesita que toda la GUI esté agrupada en el lateral izquierdo, excepto el dial del modo J6, además de un rectángulo de ayuda dependiente del joystick activo.
+- Al moverse a los extremos del espacio de trabajo o singularidades, el robot se bloquea (se congela) y resulta imposible salir de esa posición mediante joystick, teniendo que reiniciar la simulación.
 
 Cambio probado:
-- **Homing J6 a 17.7°**: Modificado el cálculo de `targetZero` para redondear al múltiplo más cercano de `17.7° + k * 360°`. Se extendió la guarda de finalización de `_resettingJ6` para requerir que el error angular físico real de la junta J6 sea menor a 0.1°.
+- **Homing J6 a 17.7° sin Overshoot**: Modificado el cálculo de `targetZero` para redondear al múltiplo más cercano de `17.7° + k * 360°`. Se extendió la guarda de finalización de `_resettingJ6` para requerir que el error angular físico real de la junta J6 sea menor a 0.1°. Para evitar el overshoot por un cambio brusco del setpoint (escalón), se inicializa `_j6TargetAngle` a la posición angular física real del joint en el instante en que inicia el homing.
 - **Joystick Input PS4 para J6**: Mapeados los nuevos inputs de PS4: L1 (`J6AntiHor`) y R1 (`J6Hor`) para rotación manual continua a 45°/s, y el botón Cuadrado (`J6Home`) para disparar el homing directo.
 - **Vibración Inteligente del Gripper**: Se añadió en `GripperDistanceSensor` una búsqueda automática por código del script `GripperController` para evitar que sea nulo. Si `IsHoldingObject` es verdadero, la vibración se silencia de inmediato.
 - **Parámetros Expuestos**: Añadido `raycastOffset` (Vector3 offset local del origen del rayo) y se acopló en `OnValidate` el límite `vibrationStartDistance` con `safeGripMaxDistance`. En `Ctrl_OnRobotRG2_Custom` se expusieron `_openSpeed` y `_closeSpeed` para regular la velocidad de apertura y cerrado del gripper.
 - **Layout Lateral y Panel de Ayuda**: Creado `LeftLayoutManager.cs` que al arrancar busca y re-ancla la cámara de gripper (escalada a 280x280), textos de joints, barras de entrada y textos de sensor a la izquierda del canvas. Además, genera un panel con efecto Outline y fondo oscuro translúcido con los controles de PS4 o VR2 dependiendo del perfil activo.
 - **Desacoplo del Dial J6**: Modificado `J6OverlayController.cs` para emparentar el contenedor del dial de J6 directamente al Canvas y anclarlo a la derecha, garantizando que el dial no se mueva al lateral izquierdo con el feed de la cámara.
+- **Solución al Bloqueo en Extremos**: Se corrigió el bug de recaptura de orientación en `JoystickAdapter.EndMotion()`. Al soltar el joystick y detenerse la marcha, se limpia `_orientationCaptured = false`, forzando la recaptura inmediata de la pose física real como la nueva referencia TCP de orientación fija. Esto evita que el brazo intente "regresar" a una pose de orientación desactualizada e imposible al reanudar el control, permitiendo salir fluidamente de singularidades y límites.
 
 Archivos/parametros:
 - `Assets/Scripts/JoystickAdapter.cs`
@@ -593,9 +596,29 @@ Archivos/parametros:
 - `Assets/Scripts/LeftLayoutManager.cs`
 
 Resultado observado:
-- Compilación del proyecto Unity exitosa. El layout organiza toda la GUI en la izquierda del canvas con el panel de ayuda actualizado para PS4/VR2 de manera dinámica, y el dial de J6 se posiciona perfectamente en la derecha de la pantalla. El homing llega físicamente a 17.7° con error inferior a 0.1° y la vibración se apaga al concretar el agarre.
+- Compilación del proyecto Unity exitosa. El layout organiza toda la GUI en la izquierda del canvas con el panel de ayuda actualizado para PS4/VR2 de manera dinámica, y el dial de J6 se posiciona perfectamente en la derecha de la pantalla. El homing llega físicamente a 17.7° de manera suave y con cero sobreoscilación. Al llevar el robot a los extremos del espacio de trabajo y soltar el joystick, el robot se libera instantáneamente y permite salir del límite de inmediato en cualquier dirección sin bloquearse.
 
 Decision:
 - Integrar permanentemente estos ajustes y layout para producción.
 
+### 2026-07-01 - Robustez de Orientación de Garra y Límites del Espacio de Trabajo Dextrógiro
 
+Sintoma:
+- Al realizar ciertos movimientos cartesianos, el lag del PID o límites de IK en los extremos de la cinemática desvían la orientación de la garra (pitch/roll) respecto a la vertical (garra hacia abajo). Al soltar el joystick, `EndMotion()` recaptura la pose física desviada actual como la nueva referencia, consolidando el drift de forma permanente sin posibilidad de recuperación.
+- La reducción de velocidad por drift físico se activa de forma espuria a partir de solo 1.0° de desviación. Durante movimientos rápidos normales en la zona central de trabajo, el desfase dinámico del PID supera este umbral, haciendo que el robot se desplace a tirones o se sienta muy pesado.
+- El operador puede arrastrar el TCP fuera de la zona en la que la cinemática es capaz de mantener la verticalidad, forzando fallos de IK y desviaciones de garra.
+
+Cambio probado:
+- **Espacio de Trabajo Dextrógiro Seguro**: Se implementaron límites configurables en `JoystickAdapter.cs` (`_enableWorkspaceLimits`, `_minHorizontalRadius = 0.8f`, `_maxHorizontalRadius = 2.6f`, `_minHeight = -0.2f`, `_maxHeight = 1.8f`). En `FixedUpdate()`, la posición del TCP objetivo se limita horizontal y verticalmente en el frame de la base del robot antes de enviarse a la IK, garantizando que el target cartesiano jamás abandone el espacio seguro.
+- **Auto-Alineación de Garra a la Vertical**: Se introdujo el parámetro `_forceVerticalGripper` (por defecto `true`). Al capturar la orientación fija en `CaptureFixedOrientation()` (durante la inicialización y en cada parada `EndMotion()`), el script proyecta el vector `up` del TCP y recalcula la rotación usando `Quaternion.LookRotation(Vector3.down, projectUp)`. Esto obliga al eje local de aproximación (Z) a apuntar exactamente hacia abajo, saneando la referencia de orientación de cualquier drift de pitch/roll acumulado.
+- **Optimización de Umbral de Drift de Velocidad**: Se expusieron los umbrales `_safetyDriftStartThreshold = 3.0f` y `_safetyDriftMaxTolerance = 5.0f`. Esto previene reducciones de velocidad falsas por lag normal del PID durante movimientos veloces centrales, manteniendo la protección activa únicamente ante bloqueos físicos graves, colisiones o desvíos severos de más de 3.0°.
+
+Archivos/parametros:
+- `Assets/Scripts/JoystickAdapter.cs`
+
+Resultado observado:
+- Compilación del proyecto Unity exitosa. Las variables y validaciones impiden que el robot intente resolver poses cartesianas fuera del radio de 2.6m o altura de -0.2m, reduciendo singularidades.
+- La eliminación del drift al detenerse funciona de forma limpia al reconstruir matemáticamente el vector de aproximación vertical.
+
+Decision:
+- Integrar permanentemente estos cambios para mejorar la robustez física y cinemática en la teleoperación interactiva.

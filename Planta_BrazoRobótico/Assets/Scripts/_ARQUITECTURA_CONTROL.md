@@ -53,13 +53,15 @@ JoystickAdapter.FixedUpdate()
 
     // Guarda de orientación física:
     // Verifica la orientación física del TCP contra la esperada.
-    // Si el drift supera 1.0°, la velocidad de la trayectoria se atenúa linealmente
-    // hasta un mínimo del 10% (a partir de 2.0°). Esto permite al operador
+    // Si el drift supera los grados en _safetyDriftStartThreshold (por defecto 3°),
+    // la velocidad de la trayectoria se atenúa linealmente hasta un mínimo del 10%
+    // al alcanzar _safetyDriftMaxTolerance (por defecto 5°). Esto permite al operador
     // corregir la desviación y salir de posiciones extremas sin congelar el brazo.
     float driftSpeedMultiplier = 1.0f;
-    if (physicalRotDrift > 1.0f)
+    if (physicalRotDrift > _safetyDriftStartThreshold)
     {
-        driftSpeedMultiplier = Mathf.Lerp(1.0f, 0.1f, (physicalRotDrift - 1.0f) / (physicalOrientationTolerance - 1.0f));
+        float range = Mathf.Max(0.1f, _safetyDriftMaxTolerance - _safetyDriftStartThreshold);
+        driftSpeedMultiplier = Mathf.Lerp(1.0f, 0.1f, (physicalRotDrift - _safetyDriftStartThreshold) / range);
         driftSpeedMultiplier = Mathf.Max(driftSpeedMultiplier, 0.1f);
     }
 
@@ -146,34 +148,31 @@ if (!_motionActive)
     BeginMotion();
 ```
 
-Con input activo, el desplazamiento del joystick se calcula en mundo Unity y luego se convierte al frame activo de Flange. La pose objetivo se arma en ese frame para que la orientacion del TCP quede fija respecto del robot, no respecto del mundo:
+Con input activo, el desplazamiento del joystick se calcula en mundo Unity y luego se convierte al frame activo de Flange. La pose objetivo se arma en ese frame para que la orientacion del TCP quede fija respecto del robot, no respecto del mundo. Adicionalmente, si `_enableWorkspaceLimits` es `true`, la posición del target se proyecta y trunca dentro del espacio dextrógiro seguro definido por los radios horizontales (`_minHorizontalRadius`/`_maxHorizontalRadius`) y límites de altura (`_minHeight`/`_maxHeight`):
 
 ```csharp
-var deltaWorld = _velocity * (_speed * Time.fixedDeltaTime);
+var deltaWorld = _velocity * (_speed * Time.fixedDeltaTime * driftSpeedMultiplier);
 var deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint);
-var currentPose = _controller.PoseObserver.ToolCenterPointFrame.Value;
+var currentPose = ... // solucion anterior o ToolCenterPointFrame
 Vector3 currentPos = (Vector3)currentPose.GetColumn(3);
-El controlador traza una trayectoria matemática partiendo del IK previo para evitar que la inercia del PID corrompa la trayectoria (Desacoplamiento de Trayectoria Cartesiana):
+Vector3 targetPosInFrame = currentPos + deltaFrame;
 
-```csharp
-Matrix4x4 currentPose;
-if (_hasPrevIkTarget)
+if (_enableWorkspaceLimits)
 {
-    Matrix4x4 prevWorldPose = _controller.Solver.ComputeForward(new JointTarget(_prevIkTarget), tool);
-    Matrix4x4 frameWorldPose = _controller.GetFrame(frame).GetWorldFrame(_controller, extJoint);
-    currentPose = frameWorldPose.inverse * prevWorldPose;
-}
-else
-{
-    currentPose = _controller.PoseObserver.ToolCenterPointFrame.Value;
-}
-```
+    Vector2 horizontalPos = new Vector2(targetPosInFrame.x, targetPosInFrame.z);
+    float distHorizontal = horizontalPos.magnitude;
+    if (distHorizontal > _maxHorizontalRadius)
+        horizontalPos = horizontalPos.normalized * _maxHorizontalRadius;
+    else if (distHorizontal < _minHorizontalRadius)
+        horizontalPos = horizontalPos.normalized * _minHorizontalRadius;
 
-La meta IK es directamente un paso en línea recta desde la meta anterior, manteniendo la orientación constante.
+    targetPosInFrame.x = horizontalPos.x;
+    targetPosInFrame.z = horizontalPos.y;
+    targetPosInFrame.y = Mathf.Clamp(targetPosInFrame.y, _minHeight, _maxHeight);
+}
 
-```csharp
 targetPose = Matrix4x4.TRS(
-    currentPos + deltaFrame,
+    targetPosInFrame,
     _fixedTcpFrameOrientation,
     Vector3.one);
 ```
@@ -214,14 +213,30 @@ Estos hooks no se usan en la operacion normal con joystick. Permiten que un runn
 
 ## 3. Orientacion del TCP
 
-La orientacion del TCP se captura y queda fija mientras se traslada:
+La orientacion del TCP se captura y queda fija mientras se traslada. Si `_forceVerticalGripper` es `true`, al capturar la orientación se calcula una rotación corregida que alinea el eje Z local del efector final (el de la garra) exactamente hacia abajo (`Vector3.down` en el frame base del robot), preservando la guiñada (yaw) de la rotación actual:
 
 ```csharp
-_fixedTcpFrameOrientation = _controller.PoseObserver.ToolCenterPointFrame.Value.rotation;
-_orientationCaptured = true;
+Quaternion rawRot = _controller.PoseObserver.ToolCenterPointFrame.Value.rotation;
+if (_forceVerticalGripper)
+{
+    Vector3 localUpInFrame = rawRot * Vector3.up;
+    Vector3 projectUp = Vector3.ProjectOnPlane(localUpInFrame, Vector3.down).normalized;
+    if (projectUp.sqrMagnitude < 0.001f)
+    {
+        Vector3 localRightInFrame = rawRot * Vector3.right;
+        projectUp = Vector3.ProjectOnPlane(localRightInFrame, Vector3.down).normalized;
+    }
+    
+    if (projectUp.sqrMagnitude > 0.001f)
+        _fixedTcpFrameOrientation = Quaternion.LookRotation(Vector3.down, projectUp);
+    else
+        _fixedTcpFrameOrientation = rawRot;
+}
+else
+{
+    _fixedTcpFrameOrientation = rawRot;
+}
 ```
-
-La orientacion fija se toma directamente desde la pose actual, preservando la rotacion exacta del TCP respecto del robot. La orientacion que se bloquea es una rotacion completa en el frame del robot.
 
 Hay dos modos de orientación disponibles mediante la propiedad `AlignOrientationWithJ1`:
 - **Orientación Fija Absoluta (`AlignOrientationWithJ1 = false`)**: La orientación del TCP permanece exactamente constante en el frame del robot (`_fixedTcpFrameOrientation`), sin importar el giro de la base (J1).
@@ -238,7 +253,7 @@ Eventos que capturan orientacion:
 | Cambio de perfil de input | Sale de modo camara, resetea estado y recaptura orientacion |
 
 > [!NOTE]
-> Al soltar el joystick o detenerse (`EndMotion()`), **no** se recaptura la orientación actual del TCP si esta está desviada física o matemáticamente, previniendo la acumulación de drift de referencia. La orientación de referencia se mantiene inalterada durante todo el recorrido del brazo cartesiano.
+> Al soltar el joystick o detenerse (`EndMotion()`), se limpia la captura y se vuelve a invocar `CaptureFixedOrientation()`. Sin embargo, gracias a la guarda `_forceVerticalGripper`, cualquier desviación transitoria o lag físico de pitch/roll acumulado en el robot real es automáticamente descartado en la referencia, alineando de nuevo la pose de control perfectamente a la vertical. Esto sanea el drift de referencia de forma continua.
 
 ---
 
@@ -325,7 +340,7 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 | Modo camara activo | No se mueve el brazo. `_velocity` queda en cero. |
 | Volver a modo robot | Remapea ejes, resetea PIDs/velocidades, recaptura orientacion. |
 | Input suprimido | `_velocity = Vector3.zero`, reset de PIDs/velocidades, UI en cero. |
-| Joystick en reposo | Resetea PIDs/velocidades, recaptura orientacion y retorna. No hay target activo (salvo si `_resettingJ6` está activo). |
+| Joystick en reposo | Resetea PIDs/velocidades, marca la orientación como no capturada para forzar recaptura desde la pose real física actual, y retorna. No hay target activo (salvo si `_resettingJ6` está activo). |
 | Inicio de recorrido | Resetea PIDs/velocidades y captura la orientacion TCP actual antes de IK. |
 | IK invalida | Limpia UI y no aplica nuevos joints en ese tick. |
 | Doble clic en gripper / Cuadrado PS4 | Activa el reseteo suave de J6 al cero físico real de 17.7° (`_resettingJ6 = true`). |

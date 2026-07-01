@@ -550,7 +550,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3268091095161572147, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.99360543
+      value: 0.9961947
       objectReference: {fileID: 0}
     - target: {fileID: 3268091095161572147, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: m_LocalRotation.x
@@ -558,7 +558,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3268091095161572147, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0.112908415
+      value: 0.08715588
       objectReference: {fileID: 0}
     - target: {fileID: 3268091095161572147, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: m_LocalRotation.z
@@ -646,7 +646,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e00
-      value: 1
+      value: 0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e01
@@ -654,7 +654,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e02
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e03
@@ -662,7 +662,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e10
-      value: -0.0000195475
+      value: -0.0000151273025
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e11
@@ -670,7 +670,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e12
-      value: 0.00008491983
+      value: 0.000085817526
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e13
@@ -678,7 +678,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e20
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e21
@@ -686,7 +686,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e22
-      value: -1
+      value: -0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._flange._value.e23
@@ -714,11 +714,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _mechanicalGroup._jointState._robJoint._r6
-      value: -12.966
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e00
-      value: 1
+      value: 0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e01
@@ -726,7 +726,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e02
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e03
@@ -734,7 +734,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e10
-      value: -0.0000195475
+      value: -0.0000151273025
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e11
@@ -742,7 +742,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e12
-      value: 0.00008491983
+      value: 0.000085817526
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e13
@@ -750,7 +750,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e20
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e21
@@ -758,7 +758,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e22
-      value: -1
+      value: -0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointBase._value.e23
@@ -766,7 +766,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e00
-      value: 1
+      value: 0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e01
@@ -774,7 +774,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e02
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e03
@@ -782,7 +782,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e10
-      value: -0.0000195475
+      value: -0.0000151273025
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e11
@@ -790,7 +790,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e12
-      value: 0.00008491983
+      value: 0.000085817526
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e13
@@ -798,7 +798,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e20
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e21
@@ -806,7 +806,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e22
-      value: -1
+      value: -0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointFrame._value.e23
@@ -814,7 +814,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e00
-      value: 1
+      value: 0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e01
@@ -822,7 +822,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e02
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e03
@@ -830,7 +830,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e10
-      value: -0.0000195475
+      value: -0.0000151273025
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e11
@@ -838,7 +838,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e12
-      value: 0.00008491983
+      value: 0.000085817526
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e13
@@ -846,7 +846,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e20
-      value: 0.000017263465
+      value: -0.051725827
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e21
@@ -854,7 +854,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e22
-      value: -1
+      value: -0.99866134
       objectReference: {fileID: 0}
     - target: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _poseObserver._toolCenterPointWorld._value.e23
@@ -862,7 +862,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6046614921875394017, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: _position._value
-      value: -12.966
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 6317385897639915450, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1229,6 +1229,8 @@ MonoBehaviour:
   activeProfileText: {fileID: 0}
   calibrationStatusText: {fileID: 0}
   futureOptionsContainer: {fileID: 0}
+  orientationModeButton: {fileID: 0}
+  joystickAdapter: {fileID: 0}
   overlayColor: {r: 0, g: 0, b: 0, a: 0.55}
   panelColor: {r: 0.08, g: 0.09, b: 0.11, a: 0.96}
   normalButtonColor: {r: 0.94272786, g: 0.9433962, b: 0.9211463, a: 1}
@@ -4038,13 +4040,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GripperDistanceSensor
   sensorOrigin: {fileID: 1424931421}
+  raycastOffset: {x: 0, y: 0, z: 0}
   localDirection: {x: 0, y: 0, z: 1}
   maxDistance: 1
   sphereRadius: 0.015
   detectionMask:
     serializedVersion: 2
     m_Bits: 8
-  triggerInteraction: 1
+  triggerInteraction: 2
   safeGripMinDistance: 0.01
   safeGripMaxDistance: 0.05
   distanceText: {fileID: 221625410}
@@ -4054,10 +4057,11 @@ MonoBehaviour:
   unsafeGripText: Ajustar posicion
   noDetectionStatusText: Sin objeto detectado
   joystickVibration: {fileID: 1424931423}
+  gripperController: {fileID: 0}
   autoFindJoystickVibration: 1
   vibrateOnProximity: 1
-  vibrationStartDistance: 0.15
-  vibrationStopDistance: 0.18
+  vibrationStartDistance: 0.05
+  vibrationStopDistance: 0.3
   stopVibrationOnDisable: 1
   drawGizmos: 1
   hitColor: {r: 0, g: 1, b: 0, a: 1}
@@ -4838,9 +4842,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Ctrl_OnRobotRG2_Custom
   ctrl_state: 0
   start_movement: 0
-  speed: 50
+  speed: 30
   stroke: 0
   _toggleGripAction: {fileID: -5323770905225322269, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
+  _openSpeed: 120
+  _closeSpeed: 140
   _gripperController: {fileID: 1721627818}
   in_position: 0
 --- !u!54 &1721627820
@@ -4891,6 +4897,9 @@ MonoBehaviour:
   _moveX: {fileID: 5248669554260487233, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _moveY: {fileID: 807227065330725814, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _moveZ: {fileID: -8327135674230221225, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
+  _j6AntiHorAction: {fileID: 0}
+  _j6HorAction: {fileID: 0}
+  _j6HomeAction: {fileID: 0}
   _invertMoveX: 1
   _invertMoveY: 0
   _invertMoveZ: 1
@@ -4898,7 +4907,7 @@ MonoBehaviour:
   _modoCamara: {fileID: -4946550936969249809, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _cameraModeAllowed: 1
   _endEffector: {fileID: 1721627814}
-  _speed: 1.07
+  _speed: 1.99
   _jointActionTexts:
   - {fileID: 0}
   - {fileID: 0}
@@ -4908,15 +4917,24 @@ MonoBehaviour:
   - {fileID: 0}
   _jointActionFormat: F3
   _kpBase: 10.8
-  _kiBase: 2.4
-  _kdBase: 0.65
+  _kiBase: 5.03
+  _kdBase: 1.03
   _referenceInertia: 5.39
   _velocityDamping: 1
   _maxJointVelocity: 60
   _logIkPoseError: 1
   _ikPoseLogInterval: 0.25
-  _j6MinLimit: -360
-  _j6MaxLimit: 360
+  _j6MinLimit: -350
+  _j6MaxLimit: 350
+  AlignOrientationWithJ1: 0
+  _enableWorkspaceLimits: 1
+  _minHorizontalRadius: 0.8
+  _maxHorizontalRadius: 2.6
+  _minHeight: -0.2
+  _maxHeight: 1.8
+  _forceVerticalGripper: 1
+  _safetyDriftStartThreshold: 3
+  _safetyDriftMaxTolerance: 5
 --- !u!114 &1731028599 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5795464575623100631, guid: aeb2126772734aa4e80e5e1cc80e3f62, type: 3}

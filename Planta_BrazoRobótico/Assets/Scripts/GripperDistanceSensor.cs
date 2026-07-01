@@ -52,7 +52,7 @@ public class GripperDistanceSensor : MonoBehaviour
         if (gripperController == null)
             gripperController = FindFirstObjectByType<GripperController>();
 
-        vibrationStartDistance = safeGripMaxDistance;
+        vibrationStartDistance = Mathf.Max(0f, vibrationStartDistance);
         vibrationStopDistance = Mathf.Max(vibrationStartDistance, vibrationStopDistance);
     }
 
@@ -158,7 +158,7 @@ public class GripperDistanceSensor : MonoBehaviour
         safeGripMinDistance = Mathf.Max(0f, safeGripMinDistance);
         safeGripMaxDistance = Mathf.Max(safeGripMinDistance, safeGripMaxDistance);
         
-        vibrationStartDistance = safeGripMaxDistance;
+        vibrationStartDistance = Mathf.Max(0f, vibrationStartDistance);
         vibrationStopDistance = Mathf.Max(vibrationStartDistance, vibrationStopDistance);
     }
 
