@@ -4172,6 +4172,55 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 6475700360738678975, guid: efbd40407cca4b94db45a983d1c69a99, type: 3}
   m_PrefabInstance: {fileID: 4432609962965866316}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1547311589
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1547311591}
+  - component: {fileID: 1547311590}
+  m_Layer: 0
+  m_Name: UDP Bridge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1547311590
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1547311589}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b86e9fab9524e7b4a8b7661ed58c4f26, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JointStateBroadcaster
+  _controller: {fileID: 1731028599}
+  _enableBroadcast: 1
+  _targetIp: 127.0.0.1
+  _targetPort: 25001
+  _sendHz: 25
+--- !u!4 &1547311591
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1547311589}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -3.00209, y: -0, z: -6.99002}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1564988212
 GameObject:
   m_ObjectHideFlags: 0
@@ -4922,6 +4971,7 @@ MonoBehaviour:
   _referenceInertia: 5.39
   _velocityDamping: 1
   _maxJointVelocity: 60
+  _maxJointAcceleration: 720
   _logIkPoseError: 1
   _ikPoseLogInterval: 0.25
   _j6MinLimit: -350
@@ -6555,3 +6605,4 @@ SceneRoots:
   - {fileID: 1030529687}
   - {fileID: 1743486728}
   - {fileID: 2003785710}
+  - {fileID: 1547311591}
