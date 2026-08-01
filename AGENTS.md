@@ -6,6 +6,13 @@ Instrucciones para Codex y otros agentes que trabajen en este repositorio.
 
 Este archivo aplica a todo el repositorio, salvo que exista un `AGENTS.md` más específico en un subdirectorio.
 
+## Índice obligatorio de codebase-memory
+
+- Antes de explorar o modificar código, ejecuta `index_repository` sobre la raíz del repositorio en modo `full` y usa el nombre de proyecto devuelto por la herramienta.
+- Para descubrir código usa, en este orden, `search_graph`, `trace_path`, `get_code_snippet`, `query_graph` y `get_architecture`. Recurre a búsquedas de texto solo para literales, archivos no indexables o cuando el grafo resulte insuficiente.
+- Después de cualquier conjunto coherente de cambios en el repositorio, vuelve a ejecutar `index_repository` en modo `full` antes de validar o entregar el trabajo. No des por finalizada una tarea con el índice desactualizado.
+- Si la indexación falla, informa el error y no presentes como vigente información obtenida de un índice anterior.
+
 ## Contexto del proyecto
 
 - Proyecto: sistema de teleoperación y simulación en realidad virtual para formación con un brazo robótico manipulador.

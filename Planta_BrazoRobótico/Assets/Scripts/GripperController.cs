@@ -16,6 +16,20 @@ public class GripperController : MonoBehaviour
 	[SerializeField]
 	private Ctrl_OnRobotRG2_Custom gripperAnimator;
 
+	[Header("Seguridad al soltar")]
+	[Tooltip("Altura Y mundial mínima de la superficie sobre la que se puede soltar un objeto.")]
+	[SerializeField]
+	private float minimumReleaseWorldY = 0f;
+
+	[Tooltip("Impide soltar el objeto por debajo de la cota inferior en la que fue recogido.")]
+	[SerializeField]
+	private bool preservePickupFloorHeight = true;
+
+	[Tooltip("Separación adicional sobre el suelo al corregir una suelta subterránea.")]
+	[SerializeField]
+	[Min(0f)]
+	private float releaseClearance = 0.005f;
+
 	[Header("Debug")]
 	[SerializeField]
 	private bool debugTriggers = true;
@@ -23,12 +37,16 @@ public class GripperController : MonoBehaviour
 	private GameObject grabbedObject;
 	private Rigidbody grabbedRigidbody;
 	private float originalMass;
+	private float pickupMinimumY;
 
 	private bool isGripperClosed = true;
+	private bool isClosing;
 
 	public bool IsHoldingObject => grabbedObject != null;
 
-	private Dictionary<GameObject, int> contactCount = new Dictionary<GameObject, int>();
+	private readonly Dictionary<GameObject, HashSet<GripperTriggerForwarder>> fingerContacts =
+		new Dictionary<GameObject, HashSet<GripperTriggerForwarder>>();
+
 	public void ToggleGrip()
 	{
 		isGripperClosed = !isGripperClosed;
@@ -36,35 +54,53 @@ public class GripperController : MonoBehaviour
 
 		if (isGripperClosed)
 		{
+			// La ventana de agarre solo existe durante una orden explícita de cierre.
+			// Así, tocar un objeto con la garra ya cerrada nunca lo adhiere.
+			isClosing = gripperAnimator != null && gripperAnimator.start_movement;
 			TryGrab();
 		}
 		else
 		{
+			isClosing = false;
 			ReleaseObject();
 		}
 	}
 
-	public void NotifyFingerContact(GameObject obj, bool isTouching)
+	public void NotifyFingerContact(GameObject obj, GripperTriggerForwarder finger, bool isTouching)
 	{
-		if(!contactCount.ContainsKey(obj))
+		if (obj == null || finger == null || !finger.IsInnerFace)
 		{
-			contactCount[obj] = 0;
+			return;
 		}
+
 		if (isTouching)
 		{
-			contactCount[obj]++;
-			if (debugTriggers) Debug.Log($"[GripperController] NotifyFingerContact: {obj.name} touched, count={contactCount[obj]}");
+			if (!fingerContacts.TryGetValue(obj, out HashSet<GripperTriggerForwarder> contacts))
+			{
+				contacts = new HashSet<GripperTriggerForwarder>();
+				fingerContacts.Add(obj, contacts);
+			}
+
+			contacts.Add(finger);
 		}
-		else
+		else if (fingerContacts.TryGetValue(obj, out HashSet<GripperTriggerForwarder> contacts))
 		{
-			contactCount[obj] = Mathf.Max(0, contactCount[obj] - 1);
-			if (debugTriggers) Debug.Log($"[GripperController] NotifyFingerContact: {obj.name} released, count={contactCount[obj]}");
+			contacts.Remove(finger);
+			if (contacts.Count == 0)
+			{
+				fingerContacts.Remove(obj);
+			}
 		}
-		if (debugTriggers) Debug.Log($"[GripperController] NotifyFingerContact: {obj.name} isTouching={isTouching}, total contacts={contactCount[obj]}");
-		
-		// Solo intentamos agarrar si la garra está cerrada lógicamente PERO aún no ha llegado a su posición final.
-		// Esto evita el bug de que se peguen objetos cuando la garra ya está completamente cerrada y choca con algo.
-		if (isGripperClosed && gripperAnimator != null && !gripperAnimator.in_position)
+
+		if (debugTriggers)
+		{
+			int contactTotal = fingerContacts.TryGetValue(obj, out HashSet<GripperTriggerForwarder> currentContacts)
+				? currentContacts.Count
+				: 0;
+			Debug.Log($"[GripperController] Contacto interno: {obj.name}, activo={isTouching}, sensores={contactTotal}");
+		}
+
+		if (isGripperClosed && isClosing)
 		{
 			TryGrab();
 		}
@@ -72,15 +108,47 @@ public class GripperController : MonoBehaviour
 
 	private void TryGrab()
 	{
-		if (grabbedObject != null) return;
-		foreach (var kvp in contactCount)
+		if (grabbedObject != null || !isClosing) return;
+
+		GameObject objectToGrab = null;
+		foreach (KeyValuePair<GameObject, HashSet<GripperTriggerForwarder>> entry in fingerContacts)
 		{
-			if(kvp.Value >= 2)
+			if (HasOpposingInnerContacts(entry.Value))
 			{
-				GrabObject(kvp.Key);
+				objectToGrab = entry.Key;
 				break;
 			}
 		}
+
+		if (objectToGrab != null)
+		{
+			GrabObject(objectToGrab);
+		}
+	}
+
+	private bool HasOpposingInnerContacts(HashSet<GripperTriggerForwarder> contacts)
+	{
+		bool touchesLeft = false;
+		bool touchesRight = false;
+
+		foreach (GripperTriggerForwarder contact in contacts)
+		{
+			if (contact == null || !contact.IsInnerFace) continue;
+
+			switch (contact.ResolveFingerSide(transform))
+			{
+				case GripperFingerSide.Left:
+					touchesLeft = true;
+					break;
+				case GripperFingerSide.Right:
+					touchesRight = true;
+					break;
+			}
+
+			if (touchesLeft && touchesRight) return true;
+		}
+
+		return false;
 	}
 
 	// Public method that child forwarders can call (legacy, no-op)
@@ -97,8 +165,11 @@ public class GripperController : MonoBehaviour
 
 	private void GrabObject(GameObject objectToGrab)
 	{
+		isClosing = false;
 		grabbedObject = objectToGrab;
 		grabbedRigidbody = grabbedObject.GetComponent<Rigidbody>();
+		Physics.SyncTransforms();
+		pickupMinimumY = GetLowestSolidPoint(grabbedObject);
 
 		if (grabbedRigidbody != null)
 		{
@@ -132,6 +203,8 @@ public class GripperController : MonoBehaviour
 	{
 		if (grabbedObject != null)
 		{
+			MoveGrabbedObjectToSafeReleaseHeight();
+
 			// Desemparentar
 			grabbedObject.transform.SetParent(null);
 
@@ -145,6 +218,8 @@ public class GripperController : MonoBehaviour
 
 				// Restaurar físicas del objeto
 				grabbedRigidbody.isKinematic = false;
+				grabbedRigidbody.linearVelocity = Vector3.zero;
+				grabbedRigidbody.angularVelocity = Vector3.zero;
 				grabbedRigidbody = null;
 			}
 
@@ -152,10 +227,61 @@ public class GripperController : MonoBehaviour
 			grabbedObject = null;
 		}
 		// Limpiar contactos para que el próximo agarre empiece desde cero.
-		contactCount.Clear();
+		fingerContacts.Clear();
 	}
 
-	void Start() { }
+	private void MoveGrabbedObjectToSafeReleaseHeight()
+	{
+		Physics.SyncTransforms();
 
-	void Update() { }
+		float lowestPoint = GetLowestSolidPoint(grabbedObject);
+		float releaseFloorY = preservePickupFloorHeight
+			? Mathf.Max(minimumReleaseWorldY, pickupMinimumY)
+			: minimumReleaseWorldY;
+		float safeMinimum = releaseFloorY + releaseClearance;
+		if (lowestPoint >= safeMinimum) return;
+
+		float correction = safeMinimum - lowestPoint;
+		grabbedObject.transform.position += Vector3.up * correction;
+		Physics.SyncTransforms();
+
+		if (debugTriggers)
+		{
+			Debug.LogWarning($"[GripperController] Se corrigió una suelta bajo el suelo en {correction:F3} m.");
+		}
+	}
+
+	private static float GetLowestSolidPoint(GameObject target)
+	{
+		Collider[] colliders = target.GetComponentsInChildren<Collider>();
+		float lowestPoint = target.transform.position.y;
+		bool hasSolidCollider = false;
+
+		foreach (Collider objectCollider in colliders)
+		{
+			if (objectCollider == null || !objectCollider.enabled || objectCollider.isTrigger) continue;
+
+			lowestPoint = hasSolidCollider
+				? Mathf.Min(lowestPoint, objectCollider.bounds.min.y)
+				: objectCollider.bounds.min.y;
+			hasSolidCollider = true;
+		}
+
+		return lowestPoint;
+	}
+
+	private void FixedUpdate()
+	{
+		if (!isClosing || gripperAnimator == null) return;
+
+		if (!gripperAnimator.start_movement && gripperAnimator.ctrl_state == 0)
+		{
+			isClosing = false;
+		}
+	}
+
+	private void OnValidate()
+	{
+		releaseClearance = Mathf.Max(0f, releaseClearance);
+	}
 }

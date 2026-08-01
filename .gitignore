@@ -57,5 +57,16 @@ $RECYCLE.BIN/
 *.3MF
 *.SLDASM
 *.AMF
+
+# === Archivos locales para agentes ===
+**/AGENTS.md
+**/CLAUDE.md
+**/GEMINI.md
+**/CODEX.md
+**/.agents/
+**/.agent/
+**/.codex/
+/.codebase-memory/
+
 *.SLDPRT
 *.SLDASM

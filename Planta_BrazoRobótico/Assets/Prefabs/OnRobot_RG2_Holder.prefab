@@ -92,6 +92,79 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &1437615809189253961
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4044985927941803531}
+  - component: {fileID: 2659543460483853088}
+  m_Layer: 0
+  m_Name: Sensor_Distancia_Trasero
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4044985927941803531
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1437615809189253961}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0, y: -0.2, z: 1.42}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2848496538688986798}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2659543460483853088
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1437615809189253961}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8eaf899d121204081412ab7a8caf5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GripperDistanceSensor
+  sensorOrigin: {fileID: 0}
+  raycastOffset: {x: 0, y: 0, z: 0}
+  localDirection: {x: 0, y: 0, z: 1}
+  maxDistance: 0.4
+  coneHalfAngle: 22.5
+  coneSamples: 8
+  coneTipRadius: 0.005
+  detectionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  triggerInteraction: 1
+  safeGripMinDistance: 0.03
+  safeGripMaxDistance: 0.12
+  distanceText: {fileID: 0}
+  operatorStatusText: {fileID: 0}
+  noHitText: --
+  safeGripText: Seguro para agarrar
+  unsafeGripText: Ajustar posicion
+  noDetectionStatusText: Sin objeto detectado
+  joystickVibration: {fileID: 0}
+  gripperController: {fileID: 0}
+  autoFindJoystickVibration: 1
+  vibrateOnProximity: 1
+  vibrationStartDistance: 0.25
+  vibrationStopDistance: 0.3
+  stopVibrationOnDisable: 1
+  drawGizmos: 1
+  hitColor: {r: 0, g: 1, b: 0, a: 1}
+  missColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &1452104470445665995
 GameObject:
   m_ObjectHideFlags: 0
@@ -183,6 +256,79 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &1711242667203942479
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5181168503967959450}
+  - component: {fileID: 4888239723143483572}
+  m_Layer: 0
+  m_Name: Sensor_Distancia_Izquierdo
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5181168503967959450
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1711242667203942479}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: -0.7071068, z: -0, w: 0.7071068}
+  m_LocalPosition: {x: -0.28, y: 0, z: 1.42}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2848496538688986798}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4888239723143483572
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1711242667203942479}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8eaf899d121204081412ab7a8caf5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GripperDistanceSensor
+  sensorOrigin: {fileID: 0}
+  raycastOffset: {x: 0, y: 0, z: 0}
+  localDirection: {x: 0, y: 0, z: 1}
+  maxDistance: 0.4
+  coneHalfAngle: 22.5
+  coneSamples: 8
+  coneTipRadius: 0.005
+  detectionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  triggerInteraction: 1
+  safeGripMinDistance: 0.03
+  safeGripMaxDistance: 0.12
+  distanceText: {fileID: 0}
+  operatorStatusText: {fileID: 0}
+  noHitText: --
+  safeGripText: Seguro para agarrar
+  unsafeGripText: Ajustar posicion
+  noDetectionStatusText: Sin objeto detectado
+  joystickVibration: {fileID: 0}
+  gripperController: {fileID: 0}
+  autoFindJoystickVibration: 1
+  vibrateOnProximity: 1
+  vibrationStartDistance: 0.25
+  vibrationStopDistance: 0.3
+  stopVibrationOnDisable: 1
+  drawGizmos: 1
+  hitColor: {r: 0, g: 1, b: 0, a: 1}
+  missColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &2466041654389383384
 GameObject:
   m_ObjectHideFlags: 0
@@ -401,6 +547,10 @@ Transform:
   - {fileID: 5260854433407610223}
   - {fileID: 4595407851985113611}
   - {fileID: 344720735734534606}
+  - {fileID: 5181168503967959450}
+  - {fileID: 3301588325398450792}
+  - {fileID: 4597766187396280023}
+  - {fileID: 4044985927941803531}
   m_Father: {fileID: 4292775835848207230}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &366464390267305107
@@ -484,6 +634,79 @@ MonoBehaviour:
   speed: 0
   stroke: 0
   in_position: 0
+--- !u!1 &4568091085728431093
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4597766187396280023}
+  - component: {fileID: 6848041487686016628}
+  m_Layer: 0
+  m_Name: Sensor_Distancia_Frontal
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4597766187396280023
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4568091085728431093}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0.7071068, w: 0}
+  m_LocalPosition: {x: 0, y: 0.2, z: 1.42}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2848496538688986798}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6848041487686016628
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4568091085728431093}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8eaf899d121204081412ab7a8caf5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GripperDistanceSensor
+  sensorOrigin: {fileID: 0}
+  raycastOffset: {x: 0, y: 0, z: 0}
+  localDirection: {x: 0, y: 0, z: 1}
+  maxDistance: 0.4
+  coneHalfAngle: 22.5
+  coneSamples: 8
+  coneTipRadius: 0.005
+  detectionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  triggerInteraction: 1
+  safeGripMinDistance: 0.03
+  safeGripMaxDistance: 0.12
+  distanceText: {fileID: 0}
+  operatorStatusText: {fileID: 0}
+  noHitText: --
+  safeGripText: Seguro para agarrar
+  unsafeGripText: Ajustar posicion
+  noDetectionStatusText: Sin objeto detectado
+  joystickVibration: {fileID: 0}
+  gripperController: {fileID: 0}
+  autoFindJoystickVibration: 1
+  vibrateOnProximity: 1
+  vibrationStartDistance: 0.25
+  vibrationStopDistance: 0.3
+  stopVibrationOnDisable: 1
+  drawGizmos: 1
+  hitColor: {r: 0, g: 1, b: 0, a: 1}
+  missColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &4919743503541057219
 GameObject:
   m_ObjectHideFlags: 0
@@ -852,6 +1075,79 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &7807204332412205553
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3301588325398450792}
+  - component: {fileID: 5446764711538146647}
+  m_Layer: 0
+  m_Name: Sensor_Distancia_Derecho
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3301588325398450792
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7807204332412205553}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 0.28, y: 0, z: 1.42}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2848496538688986798}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5446764711538146647
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7807204332412205553}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e8eaf899d121204081412ab7a8caf5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GripperDistanceSensor
+  sensorOrigin: {fileID: 0}
+  raycastOffset: {x: 0, y: 0, z: 0}
+  localDirection: {x: 0, y: 0, z: 1}
+  maxDistance: 0.4
+  coneHalfAngle: 22.5
+  coneSamples: 8
+  coneTipRadius: 0.005
+  detectionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  triggerInteraction: 1
+  safeGripMinDistance: 0.03
+  safeGripMaxDistance: 0.12
+  distanceText: {fileID: 0}
+  operatorStatusText: {fileID: 0}
+  noHitText: --
+  safeGripText: Seguro para agarrar
+  unsafeGripText: Ajustar posicion
+  noDetectionStatusText: Sin objeto detectado
+  joystickVibration: {fileID: 0}
+  gripperController: {fileID: 0}
+  autoFindJoystickVibration: 1
+  vibrateOnProximity: 1
+  vibrationStartDistance: 0.25
+  vibrationStopDistance: 0.3
+  stopVibrationOnDisable: 1
+  drawGizmos: 1
+  hitColor: {r: 0, g: 1, b: 0, a: 1}
+  missColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!1 &8713477336609285795
 GameObject:
   m_ObjectHideFlags: 0

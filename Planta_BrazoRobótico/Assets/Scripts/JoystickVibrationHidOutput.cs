@@ -2,6 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.DualShock;
 
 public class JoystickVibrationHidOutput : MonoBehaviour
 {
@@ -17,6 +19,12 @@ public class JoystickVibrationHidOutput : MonoBehaviour
     [SerializeField, Range(0, 255)] private int motorOffValue = 0x00;
     [SerializeField] private bool turnOffOnDisable = true;
 
+    [Header("PS4 / Input System")]
+    [SerializeField] private bool vibratePs4Gamepads = true;
+    [SerializeField, Range(0f, 1f)] private float ps4LowFrequencyMotor = 0.35f;
+    [SerializeField, Range(0f, 1f)] private float ps4HighFrequencyMotor = 0.65f;
+    [SerializeField, Min(0.5f)] private float ps4RumbleRefreshInterval = 5f;
+
     [Header("Debug")]
     [SerializeField] private bool logConnection = true;
 
@@ -26,15 +34,20 @@ public class JoystickVibrationHidOutput : MonoBehaviour
     private bool? _sentState;
     private bool _loggedMissingDevice;
     private bool _loggedWriteFailure;
+    private bool? _sentPs4State;
+    private float _nextPs4RefreshTime;
 
     public bool IsConnected => _device != null && _device.IsOpen;
     public bool MotorEnabled => _sentState == true;
+    public bool Ps4MotorEnabled => _sentPs4State == true;
 
     private ushort VendorIdValue => (ushort)Mathf.Clamp(vendorId, 0, 0xFFFF);
     private ushort ProductIdValue => (ushort)Mathf.Clamp(productId, 0, 0xFFFF);
 
     private void Start()
     {
+        TrySendPs4RequestedState(force: true);
+
         if (!connectOnStart) return;
 
         TryConnect();
@@ -43,6 +56,8 @@ public class JoystickVibrationHidOutput : MonoBehaviour
 
     private void Update()
     {
+        TrySendPs4RequestedState();
+
         if (_sentState.HasValue && _sentState.Value == _requestedState) return;
 
         TrySendRequestedState();
@@ -53,6 +68,7 @@ public class JoystickVibrationHidOutput : MonoBehaviour
         if (turnOffOnDisable)
         {
             _requestedState = false;
+            TrySendPs4RequestedState(force: true);
             TrySendRequestedState(force: true);
         }
 
@@ -64,13 +80,50 @@ public class JoystickVibrationHidOutput : MonoBehaviour
         if (!turnOffOnDisable) return;
 
         _requestedState = false;
+        TrySendPs4RequestedState(force: true);
         TrySendRequestedState(force: true);
     }
 
     public bool SetMotor(bool enabled)
     {
         _requestedState = enabled;
-        return TrySendRequestedState();
+        bool sentToPs4 = TrySendPs4RequestedState(force: true);
+        bool sentToHid = TrySendRequestedState();
+        return sentToPs4 || sentToHid;
+    }
+
+    private bool TrySendPs4RequestedState(bool force = false)
+    {
+        if (!vibratePs4Gamepads)
+        {
+            _sentPs4State = null;
+            return false;
+        }
+
+        if (!force && Time.unscaledTime < _nextPs4RefreshTime)
+        {
+            return _sentPs4State.HasValue && _sentPs4State.Value == _requestedState;
+        }
+
+        bool needsRefresh = _requestedState && Time.unscaledTime >= _nextPs4RefreshTime;
+        if (!force && _sentPs4State.HasValue && _sentPs4State.Value == _requestedState && !needsRefresh)
+            return true;
+
+        float lowFrequency = _requestedState ? ps4LowFrequencyMotor : 0f;
+        float highFrequency = _requestedState ? ps4HighFrequencyMotor : 0f;
+        bool foundPs4Gamepad = false;
+
+        foreach (InputDevice device in InputSystem.devices)
+        {
+            if (device is not DualShockGamepad gamepad) continue;
+
+            gamepad.SetMotorSpeeds(lowFrequency, highFrequency);
+            foundPs4Gamepad = true;
+        }
+
+        _sentPs4State = foundPs4Gamepad ? _requestedState : null;
+        _nextPs4RefreshTime = Time.unscaledTime + Mathf.Max(0.5f, ps4RumbleRefreshInterval);
+        return foundPs4Gamepad;
     }
 
     [ContextMenu("Motor ON")]
@@ -172,6 +225,9 @@ public class JoystickVibrationHidOutput : MonoBehaviour
         reportIdPrefix = Mathf.Clamp(reportIdPrefix, 0, 255);
         motorOnValue = Mathf.Clamp(motorOnValue, 0, 255);
         motorOffValue = Mathf.Clamp(motorOffValue, 0, 255);
+        ps4LowFrequencyMotor = Mathf.Clamp01(ps4LowFrequencyMotor);
+        ps4HighFrequencyMotor = Mathf.Clamp01(ps4HighFrequencyMotor);
+        ps4RumbleRefreshInterval = Mathf.Max(0.5f, ps4RumbleRefreshInterval);
     }
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
