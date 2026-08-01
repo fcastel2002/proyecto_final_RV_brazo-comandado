@@ -1,0 +1,11 @@
+{
+    "schema_version": 2,
+    "commit": "3530b5e4a56169140586d37ca14403af2ae86932",
+    "indexed_at": "2026-08-01T15:01:49Z",
+    "project": "proyecto_final_RV_brazo-comandado",
+    "nodes": 6601,
+    "edges": 28109,
+    "original_size": 15794176,
+    "compressed_size": 3787650,
+    "compression_level": 9
+}
