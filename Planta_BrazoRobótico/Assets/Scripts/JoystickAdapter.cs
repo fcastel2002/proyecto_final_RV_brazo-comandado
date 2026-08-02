@@ -1,5 +1,4 @@
 using Preliy.Flange;
-using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -61,9 +60,8 @@ public class JoystickAdapter : MonoBehaviour
     [SerializeField] private float _speed = 0.1f;
 
     [Header("UI - Accion de control por articulacion")]
-    [Tooltip("Textos TMP del panel para mostrar la accion de control de J1 a J6.")]
-    [SerializeField] private TextMeshProUGUI[] _jointActionTexts = new TextMeshProUGUI[6];
-    [SerializeField] private string _jointActionFormat = "F3";
+    [Tooltip("Panel estático (PID_Section) que muestra la accion de control de J1 a J6.")]
+    [SerializeField] private PidActionsPanel _pidActionsPanel;
 
     [Header("Control PID")]
     [Tooltip("Ganancia proporcional. Unidades: (°/s²) / (°) a inercia de referencia.")]
@@ -1071,14 +1069,10 @@ public class JoystickAdapter : MonoBehaviour
 
     private void UpdateJointActionDisplay()
     {
-        if (_jointActionTexts == null) return;
+        if (_pidActionsPanel == null) return;
 
-        int count = Mathf.Min(_jointActionTexts.Length, _lastJointControlActions.Length);
-        for (int i = 0; i < count; i++)
-        {
-            if (_jointActionTexts[i] == null) continue;
-            _jointActionTexts[i].text = _lastJointControlActions[i].ToString(_jointActionFormat);
-        }
+        for (int i = 0; i < _lastJointControlActions.Length; i++)
+            _pidActionsPanel.SetJointAction(i, _lastJointControlActions[i]);
     }
 
     private void ClearJointActionDisplay()
@@ -1127,18 +1121,5 @@ public class JoystickAdapter : MonoBehaviour
         
         _dirX = Vector3.Cross(Vector3.up, _dirZ).normalized;
         _signX = 1f;
-    }
-
-    private void OnGUI()
-    {
-        if (!Application.isPlaying) return;
-        
-        // Dibuja una caja semi-transparente en la esquina superior izquierda
-        GUI.Box(new Rect(10, 10, 220, 150), "Acciones de Control (PID)");
-        
-        for (int i = 0; i < 6; i++)
-        {
-            GUI.Label(new Rect(20, 35 + i * 18, 200, 20), $"Joint {i + 1}: {_lastJointControlActions[i]:F3} °/s²");
-        }
     }
 }

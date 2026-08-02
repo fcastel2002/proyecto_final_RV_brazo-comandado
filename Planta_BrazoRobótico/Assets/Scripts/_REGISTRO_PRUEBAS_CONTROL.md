@@ -622,3 +622,34 @@ Resultado observado:
 
 Decision:
 - Integrar permanentemente estos cambios para mejorar la robustez física y cinemática en la teleoperación interactiva.
+
+### 2026-08-02 - Unificación estática de paneles UI (PID / Guía / Cámara Gripper)
+
+Sintoma:
+- El panel "Acciones de Control (PID)" se dibujaba con `OnGUI()` (IMGUI legacy) en `JoystickAdapter.cs`, sin relación con el Canvas, sin fuente TMP y solo visible en Play.
+- El panel "Guía de Controles (PS4)" se creaba 100% por código en runtime (`LeftLayoutManager.CreateHelpPanel()`, `new GameObject` + `AddComponent`), tampoco visible en el Editor.
+- `CameraGripperView` era estático en la escena pero `LeftLayoutManager` la reposicionaba por código cada Play, sin relación visual con los otros dos paneles.
+- Pedido del usuario: unificar los tres elementos en un mismo recuadro/fondo, visibles también en modo Editor (no solo generados dinámicamente), y dejar ambos paneles fácilmente escalables para agregar más ítems a futuro.
+
+Cambio probado:
+- Se creó a mano en `Assets/Scenes/Planta.unity`, bajo `Canvas`, el contenedor estático `InfoPanel_Gripper` (Image + Outline + Vertical Layout Group + Content Size Fitter), con dos hijos `PID_Section` y `Guide_Section` (mismo patrón de Layout Group anidado + Content Size Fitter) y, como tercer hijo, `CameraGripperView` reparentado (antes colgaba directo de `Canvas`).
+- `PID_Section` contiene 6 filas TMP fijas (`PID_Row_J1`...`J6`) + una fila plantilla inactiva (`PID_RowTemplate`) para futuras filas.
+- `Guide_Section` contiene 7 ítems TMP fijos (los mismos comandos PS4 que ya existían) + un ítem plantilla inactivo (`Guide_ItemTemplate`).
+- Nuevo `Assets/Scripts/PidActionsPanel.cs`: componente en `PID_Section`, expone `SetJointAction(index, value)` y `SetExtraRow(key, label, value)` (clona `PID_RowTemplate` solo si se pide una fila que no existe todavía).
+- Nuevo `Assets/Scripts/ControlGuidePanel.cs`: componente en `Guide_Section`, expone `SetProfile(profile)` (contiene los textos PS4/VR2 que antes vivían embebidos en `LeftLayoutManager`) y `AddOrUpdateItem(key, texto)` (clona `Guide_ItemTemplate` solo si hace falta).
+- `JoystickAdapter.cs`: se eliminó el método `OnGUI()` completo y el array suelto `_jointActionTexts`/`_jointActionFormat`. `UpdateJointActionDisplay()` ahora llama a `_pidActionsPanel.SetJointAction(i, valor)` para cada joint. Este cambio es **solo de visualización**, no toca la cadena de control (`ApplyPID`, PID, IK, límites de workspace no se modificaron).
+- `LeftLayoutManager.cs`: se eliminaron `CreateHelpPanel()` y el bloque que reposicionaba `CameraGripperView` por código (ahora su posición la controla el Vertical Layout Group de `InfoPanel_Gripper`). `UpdateHelpText()` ahora busca el `ControlGuidePanel` una vez y le delega `SetProfile(...)`. El reposicionamiento por código de `Input Info`/`J1`-`J6`/`SafetyInfoOperator`/`DistanceSensorValue` se dejó sin cambios (fuera de alcance de este pedido).
+
+Archivos/parametros:
+- `Assets/Scripts/JoystickAdapter.cs`
+- `Assets/Scripts/LeftLayoutManager.cs`
+- `Assets/Scripts/PidActionsPanel.cs` (nuevo)
+- `Assets/Scripts/ControlGuidePanel.cs` (nuevo)
+- `Assets/Scenes/Planta.unity`: `InfoPanel_Gripper`, `PID_Section`, `Guide_Section` (nuevos, creados a mano en el Editor).
+
+Resultado observado:
+- Feedback del usuario en Play Mode: "Funcinó perfecto" — los tres elementos quedan contenidos en el mismo recuadro/fondo, PID y Guía apilados verticalmente con títulos amarillo/negrita, cámara del gripper funcionando igual que antes, sin errores de compilación en la Console.
+- No se pudo correr la validación en batchmode (`Unity -batchmode -nographics -quit`) porque el Editor del usuario ya tenía el proyecto abierto (Unity bloquea instancias múltiples sobre el mismo proyecto); se validó por recompilación automática del Editor abierto y prueba manual en Play Mode.
+
+Decision:
+- Mantener e integrar los cambios. Nota de compatibilidad con arquitectura de control: el cambio es exclusivamente de UI/visualización (paneles PID y Guía + contenedor del feed de cámara); no se tocó `ApplyPID`, `JointPID`, `RobotDynamics`, la generación del target IK ni los límites de workspace/orientación documentados en `_ARQUITECTURA_CONTROL.md`.

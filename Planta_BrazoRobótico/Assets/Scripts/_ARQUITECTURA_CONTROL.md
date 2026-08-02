@@ -360,7 +360,9 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 | `JointStatePublisher.cs` | Publicacion de estado articular | Independiente |
 | `RobotTest.cs` | Pruebas/manual | Independiente |
 | `J6OverlayController.cs` | Dibuja un dial superpuesto en Canvas (derecha) cuando el modo J6 exclusivo está activo | UI de J6 Exclusivo |
-| `LeftLayoutManager.cs` | Agrupa dinámicamente toda la GUI en la izquierda y dibuja el panel de ayuda de controles | UI General |
+| `LeftLayoutManager.cs` | Reposiciona por código `Input Info`/`J1`-`J6`/`SafetyInfoOperator`/`DistanceSensorValue` y delega a `ControlGuidePanel` el cambio de texto PS4/VR2. Ya no crea GameObjects por código. | UI General |
+| `PidActionsPanel.cs` | Panel estático (`PID_Section`, hijo de `InfoPanel_Gripper`) con las 6 filas fijas de acción PID por joint; expone `SetJointAction`/`SetExtraRow` para agregar filas nuevas clonando una plantilla inactiva solo si hace falta | UI de Acciones de Control (PID) |
+| `ControlGuidePanel.cs` | Panel estático (`Guide_Section`, hijo de `InfoPanel_Gripper`) con los ítems fijos de la guía de controles PS4/VR2; expone `AddOrUpdateItem` para agregar comandos nuevos clonando una plantilla inactiva solo si hace falta | UI de Guía de Controles |
 
 ---
 
