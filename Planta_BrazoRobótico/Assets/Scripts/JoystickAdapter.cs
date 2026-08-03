@@ -81,6 +81,16 @@ public class JoystickAdapter : MonoBehaviour
     [Tooltip("Aceleración angular máxima por joint (°/s²). Límite de seguridad dinámico para evitar tirones fuertes.")]
     [SerializeField] private float _maxJointAcceleration = 720f;
 
+    [Header("Simulación de Carga (Payload)")]
+    [Tooltip("GripperController que reporta el objeto agarrado y su masa. Si se deja vacío, se busca automáticamente en escena.")]
+    [SerializeField] private GripperController _gripperController;
+    [Tooltip("Multiplicador sobre la masa del objeto agarrado al sumarla a la inercia efectiva (RobotDynamics). 1 = física real. >1 exagera el efecto; 0 lo desactiva. Nota: el feedforward de velocidad del PID cancela casi todo este efecto en régimen estable; ver _maxSimulatedPayloadMass para el efecto perceptible en velocidad.")]
+    [SerializeField, Min(0f)] private float _payloadInertiaMultiplier = 1f;
+    [Tooltip("Masa (kg) a partir de la cual la velocidad cartesiana cae hasta _minPayloadSpeedMultiplier. Con el 'Cubo Prueba' de Mass=20 como referencia.")]
+    [SerializeField, Min(0.01f)] private float _maxSimulatedPayloadMass = 20f;
+    [Tooltip("Fracción mínima de velocidad cartesiana permitida al cargar el objeto más pesado soportado (nunca 0, para no bloquear al operador).")]
+    [SerializeField, Range(0.05f, 1f)] private float _minPayloadSpeedMultiplier = 0.25f;
+
     [Header("Diagnostico IK")]
     [Tooltip("Loguea error entre el target cartesiano enviado a IK y la FK de solution.JointTarget.")]
     [SerializeField] private bool _logIkPoseError = true;
@@ -188,6 +198,9 @@ public class JoystickAdapter : MonoBehaviour
     {
         if (_calibrationManager == null)
             _calibrationManager = FindFirstObjectByType<AnalogCalibrationManager>();
+
+        if (_gripperController == null)
+            _gripperController = FindFirstObjectByType<GripperController>();
 
         if (Application.isBatchMode)
         {
@@ -580,8 +593,17 @@ public class JoystickAdapter : MonoBehaviour
             Debug.LogWarning($"[JoystickAdapter][Orientación] Desviación temporal detectada ({physicalRotDrift:F1}deg). El IK intentará corregirlo automáticamente.");
         }
 
+        // Penaliza la velocidad cartesiana según la masa del objeto agarrado, simulando el peso de la carga.
+        // Se aplica ANTES de la IK (no por joint) para no romper la relación geométrica entre articulaciones.
+        float payloadSpeedMultiplier = 1f;
+        if (_gripperController != null && _gripperController.IsHoldingObject)
+        {
+            float massRatio = Mathf.Clamp01(_gripperController.GrabbedMass / _maxSimulatedPayloadMass);
+            payloadSpeedMultiplier = Mathf.Lerp(1f, _minPayloadSpeedMultiplier, massRatio);
+        }
+
         // ── Cálculo de trayectoria ───────────────────────────────────────
-        var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier);
+        var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier);
         var deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint);
         
         Matrix4x4 currentPose;
@@ -1000,7 +1022,16 @@ public class JoystickAdapter : MonoBehaviour
     private void ApplyPID(JointTarget ikTarget, float dt)
     {
         var robotJoints = _controller.MechanicalGroup.RobotJoints;
-        float[] jEff = RobotDynamics.ComputeEffectiveInertia(robotJoints);
+
+        float payloadMass = 0f;
+        Vector3 payloadWorldPos = Vector3.zero;
+        if (_gripperController != null && _gripperController.IsHoldingObject)
+        {
+            payloadMass = _gripperController.GrabbedMass * _payloadInertiaMultiplier;
+            payloadWorldPos = _gripperController.GrabbedWorldPosition;
+        }
+
+        float[] jEff = RobotDynamics.ComputeEffectiveInertia(robotJoints, payloadMass, payloadWorldPos);
 
         var qNew = new float[6];
         for (int i = 0; i < 6; i++)

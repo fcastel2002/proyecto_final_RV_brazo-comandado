@@ -40,8 +40,15 @@ public static class RobotDynamics
     /// giran sobre el –Y del frame padre, por lo que el eje en mundo es
     ///   i == 0 → robotJoints[0].transform.parent.up
     ///   i  > 0 → robotJoints[i-1].transform.up
+    ///
+    /// Si <paramref name="payloadMass"/> es mayor a cero, se suma como una masa puntual
+    /// adicional en <paramref name="payloadWorldPos"/> (p.ej. un objeto agarrado por el
+    /// gripper), sumando su propio término masa·distancia² a cada joint.
     /// </summary>
-    public static float[] ComputeEffectiveInertia(IReadOnlyList<TransformJoint> robotJoints)
+    public static float[] ComputeEffectiveInertia(
+        IReadOnlyList<TransformJoint> robotJoints,
+        float payloadMass = 0f,
+        Vector3? payloadWorldPos = null)
     {
         var result = new float[6];
 
@@ -58,6 +65,12 @@ public static class RobotDynamics
                 Vector3 comWorld = robotJoints[j].transform.TransformPoint(Links[j].ComLocal);
                 float d = PerpendicularDistance(comWorld, axisOrigin, axisDir);
                 jEff += Links[j].Mass * d * d;
+            }
+
+            if (payloadMass > 0f && payloadWorldPos.HasValue)
+            {
+                float dPayload = PerpendicularDistance(payloadWorldPos.Value, axisOrigin, axisDir);
+                jEff += payloadMass * dPayload * dPayload;
             }
 
             result[i] = jEff;

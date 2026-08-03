@@ -44,6 +44,12 @@ public class GripperController : MonoBehaviour
 
 	public bool IsHoldingObject => grabbedObject != null;
 
+	/// <summary>Masa original (kg) del objeto actualmente agarrado, o 0 si no hay ninguno.</summary>
+	public float GrabbedMass => grabbedObject != null ? originalMass : 0f;
+
+	/// <summary>Posición mundial del punto de agarre (graspPoint), rígidamente ligado al objeto agarrado.</summary>
+	public Vector3 GrabbedWorldPosition => graspPoint != null ? graspPoint.position : transform.position;
+
 	private readonly Dictionary<GameObject, HashSet<GripperTriggerForwarder>> fingerContacts =
 		new Dictionary<GameObject, HashSet<GripperTriggerForwarder>>();
 

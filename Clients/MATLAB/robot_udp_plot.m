@@ -77,6 +77,15 @@ lastKeepAlive = tic;
 figure('Name', 'KR210 - replica desde Unity');
 robot.plot([0 0 0 0 0 0], 'workspace', [-2.5 2.5 -2.5 2.5 0 3.5], 'notiles', 'noname');
 
+% Panel con los angulos articulares actuales (deg, tal como llegan de
+% Unity, antes de aplicar Offset/Factor). 'Units','normalized' lo fija
+% a la esquina superior izquierda de los ejes en pantalla sin que rote
+% con la camara 3D (misma idea que el panel de udp_robot_viewer.py, ahi
+% resuelto con fig.text() de matplotlib).
+jointPanel = text(0.02, 0.95, 0, formatJointPanel([0 0 0 0 0 0]), ...
+    'Units', 'normalized', 'FontName', 'FixedWidth', 'FontSize', 10, ...
+    'VerticalAlignment', 'top', 'Interpreter', 'none');
+
 fprintf('Escuchando... (Ctrl+C para detener)\n\n');
 
 %% --- 5) Loop de recepcion, keep-alive y animacion ---
@@ -114,9 +123,17 @@ while true
         adjusted_deg = (q_deg + JOINT_CONFIG_OFFSET_DEG) .* JOINT_CONFIG_FACTOR;
         q_rad = deg2rad(adjusted_deg);
 
+        jointPanel.String = formatJointPanel(q_deg);
         robot.plot(q_rad);
         drawnow limitrate;
     else
         pause(0.01);
+    end
+end
+
+function lines = formatJointPanel(q_deg)
+    lines = {'Articulaciones (deg):'};
+    for i = 1:numel(q_deg)
+        lines{end + 1} = sprintf('  J%d: %7.2f', i, q_deg(i)); %#ok<AGROW>
     end
 end

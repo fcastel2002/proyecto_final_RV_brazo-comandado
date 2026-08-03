@@ -1,0 +1,25 @@
+\documentclass[12pt]{article}
+\usepackage{EngReport}
+\graphicspath{{Imagenes/}}
+\bibliography{Sources}
+\onehalfspacing
+\geometry{letterpaper, portrait, includeheadfoot=true, hmargin=1in, vmargin=1in}
+
+% Nombres en español
+\renewcommand{\contentsname}{Índice}
+\renewcommand{\figurename}{Figura}
+\renewcommand{\tablename}{Tabla}
+
+\begin{document}
+\renewcommand{\familydefault}{\rmdefault}
+
+\input{titlepage}
+\input{headerfooter}
+
+\tableofcontents
+\pagebreak
+
+\input{contenido}
+
+\printbibliography
+\end{document}

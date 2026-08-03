@@ -302,7 +302,7 @@ _hasPrevCurrent = false;
 
 ---
 
-## 5. Inercia simulada y muneca
+## 5. Inercia simulada, muneca y carga (payload) agarrada
 
 **Archivo:** `Assets/Scripts/RobotDynamics.cs`
 
@@ -312,7 +312,56 @@ _hasPrevCurrent = false;
 J_eff[i] = sum(j >= i) masa_j * distancia_perpendicular_ij^2
 ```
 
+Acepta dos parametros opcionales, `payloadMass` y `payloadWorldPos`. Si `payloadMass > 0`, se suma un termino extra `payloadMass * distancia_perpendicular_i_payload^2` a `J_eff[i]` de cada joint, tratando el objeto agarrado como una masa puntual en `payloadWorldPos`. Con los valores por defecto (`payloadMass = 0`) el calculo es identico al anterior; nada cambia si no hay objeto agarrado.
+
+**Archivo:** `Assets/Scripts/GripperController.cs`
+
+Expone de solo lectura:
+
+- `GrabbedMass`: masa original (kg) del objeto actualmente agarrado, o `0` si no hay ninguno.
+- `GrabbedWorldPosition`: posicion mundial del `graspPoint`, rigidamente ligado al objeto agarrado mientras esta tomado.
+
 **Archivo:** `Assets/Scripts/JoystickAdapter.cs`
+
+`Awake()` cachea una referencia a `GripperController` (busqueda automatica con `FindFirstObjectByType<GripperController>()` si el campo `_gripperController` quedo sin asignar en el Inspector, mismo patron que ya usa `GripperDistanceSensor`).
+
+`ApplyPID()` consulta `_gripperController.IsHoldingObject` antes de calcular `jEff`:
+
+```csharp
+float payloadMass = 0f;
+Vector3 payloadWorldPos = Vector3.zero;
+if (_gripperController != null && _gripperController.IsHoldingObject)
+{
+    payloadMass = _gripperController.GrabbedMass * _payloadInertiaMultiplier;
+    payloadWorldPos = _gripperController.GrabbedWorldPosition;
+}
+
+float[] jEff = RobotDynamics.ComputeEffectiveInertia(robotJoints, payloadMass, payloadWorldPos);
+```
+
+`_payloadInertiaMultiplier` (default `1`) escala la masa antes de sumarla a la inercia: `1` = fisica real (masa del `Rigidbody` del cubo), `0` desactiva el efecto, valores mayores lo exageran para fines didacticos en VR sin tocar ganancias PID ni la tabla `RobotDynamics.Links`.
+
+> [!WARNING]
+> Este mecanismo por si solo **no produce un cambio perceptible de velocidad**, sin importar cuanto se suba `_payloadInertiaMultiplier`. El feedforward de velocidad de la seccion 4 (`feedforwardTorque = (jNorm/dt) * (...)`, luego dividido por `jNorm` en `acceleration = torque / jNorm`) cancela algebraicamente el termino de inercia: la velocidad articular se empuja hacia `qTargetVelocity` en cada tick sin que la masa lo frene. Solo el termino PID puro (`Kp*error + Ki*integral + Kd*derivative`) queda dividido por `jNorm` sin cancelarse, y ese termino es chico frente al feedforward cuando el seguimiento va razonablemente bien. Verificado empiricamente: subir el multiplicador de 1 a 10 no cambio la velocidad de subida percibida (feedback del usuario, 2026-08-02). Se mantiene como termino fisicamente correcto (afecta el arranque/transitorios y el caso sin feedforward), pero **no** es el mecanismo que produce el efecto de "carga pesada = mas lento". Ver el multiplicador de velocidad cartesiana mas abajo para eso.
+
+### Penalizacion de velocidad cartesiana por payload (el mecanismo que si es perceptible)
+
+**Archivo:** `Assets/Scripts/JoystickAdapter.cs`, metodo `FixedUpdate()`.
+
+Antes de construir `deltaWorld`, se calcula `payloadSpeedMultiplier` a partir de la masa del objeto agarrado y se lo multiplica junto a `driftSpeedMultiplier`:
+
+```csharp
+float payloadSpeedMultiplier = 1f;
+if (_gripperController != null && _gripperController.IsHoldingObject)
+{
+    float massRatio = Mathf.Clamp01(_gripperController.GrabbedMass / _maxSimulatedPayloadMass);
+    payloadSpeedMultiplier = Mathf.Lerp(1f, _minPayloadSpeedMultiplier, massRatio);
+}
+
+var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier);
+```
+
+`_maxSimulatedPayloadMass` (kg) define la masa a partir de la cual la velocidad cae hasta el piso `_minPayloadSpeedMultiplier` (nunca 0, para no bloquear al operador). Se aplica sobre la **trayectoria cartesiana completa antes de la IK**, no sobre cada joint por separado: todos los joints ven la misma trayectoria recta, solo que mas lenta, preservando la relacion geometrica entre velocidades articulares. Clampear velocidades por joint de forma independiente ya demostro romper esa relacion y corromper la orientacion del TCP (ver entrada del 2026-06-29 "Analisis de Limite de Velocidad vs. Trayectoria Cartesiana" en `_REGISTRO_PRUEBAS_CONTROL.md`); por eso el ajuste se hace aca y no en `ApplyPID()`.
 
 `ApplyPID()` divide el torque virtual por una inercia normalizada:
 

@@ -22,7 +22,7 @@ public class ControlGuidePanel : MonoBehaviour
         "• <b>Mover TCP (Y):</b> Stick Derecho",
         "• <b>Rotar J6:</b> L1 (Anti-hor) / R1 (Horario)",
         "• <b>Homing J6:</b> Botón Cuadrado",
-        "• <b>Abrir/Cerrar Garra:</b> R2 / L2",
+        "• <b>Abrir/Cerrar Garra:</b> R3",
         "• <b>Hold Garra (1s):</b> Homing J6",
         "• <b>Cámara/Modo:</b> L3 (Doble click: Modo J6)"
     };

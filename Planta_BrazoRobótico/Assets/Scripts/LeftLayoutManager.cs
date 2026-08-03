@@ -53,20 +53,8 @@ public class LeftLayoutManager : MonoBehaviour
         GameObject cameraView = GameObject.Find("CameraGripperView");
         if (cameraView == null) return;
 
-        GameObject inputInfo = GameObject.Find("Input Info");
         GameObject safetyInfo = GameObject.Find("SafetyInfoOperator");
         GameObject distanceSensor = GameObject.Find("DistanceSensorValue");
-
-        // Reposicionar 'Input Info'
-        if (inputInfo != null)
-        {
-            RectTransform rt = inputInfo.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 1f);
-            rt.sizeDelta = new Vector2(280f, 130f);
-            rt.anchoredPosition = new Vector2(20f, -20f);
-        }
 
         // Reposicionar 'J1' a 'J6'
         string[] jointNames = { "J1", "J2", "J3", "J4", "J5", "J6" };

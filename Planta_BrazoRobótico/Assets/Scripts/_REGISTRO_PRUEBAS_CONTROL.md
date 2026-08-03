@@ -653,3 +653,63 @@ Resultado observado:
 
 Decision:
 - Mantener e integrar los cambios. Nota de compatibilidad con arquitectura de control: el cambio es exclusivamente de UI/visualización (paneles PID y Guía + contenedor del feed de cámara); no se tocó `ApplyPID`, `JointPID`, `RobotDynamics`, la generación del target IK ni los límites de workspace/orientación documentados en `_ARQUITECTURA_CONTROL.md`.
+
+### 2026-08-02 - Simulación de peso (Mass) del objeto agarrado en la inercia efectiva
+
+Sintoma:
+- El usuario notó que el tag `Agarrable` y la propiedad `Mass` de los cubos (Rigidbody) no afectaban en absoluto la velocidad de subida del gripper con un cubo agarrado. Se confirmó por lectura de código: `RobotDynamics.ComputeEffectiveInertia()` solo usaba la tabla estática `Links[]` (masas fijas del URDF, `Links[5].Mass = 0.5f` para el link_6/gripper) y nunca leía el `Rigidbody.mass` real del cubo ni el `Rigidbody` (kinemático) del gripper. El tag `Agarrable` solo se usa en `GrabbableSafetyGuard` (recuperación al caer del mapa) y `GripperTriggerForwarder` (filtro de qué se puede agarrar), sin relación con el PID.
+
+Cambio probado:
+- `RobotDynamics.ComputeEffectiveInertia(robotJoints, payloadMass = 0f, payloadWorldPos = null)`: nuevos parámetros opcionales (backward-compatible). Si `payloadMass > 0`, suma `payloadMass * distancia_perpendicular_i_payload²` a `J_eff[i]` de cada joint, tratando el objeto agarrado como masa puntual.
+- `GripperController.cs`: nuevas propiedades de solo lectura `GrabbedMass` (masa original del objeto agarrado, 0 si no hay ninguno) y `GrabbedWorldPosition` (posición mundial del `graspPoint`). No se tocó la lógica de agarre/suelta/transferencia de masa al `Rigidbody` del gripper.
+- `JoystickAdapter.cs`: nuevo campo `_gripperController` (auto-resuelto en `Awake()` con `FindFirstObjectByType<GripperController>()` si no se asigna en el Inspector, mismo patrón que `GripperDistanceSensor`) y nuevo campo `_payloadInertiaMultiplier` (default `1`, `[Min(0f)]`). En `ApplyPID()`, si `_gripperController.IsHoldingObject`, se pasa `GrabbedMass * _payloadInertiaMultiplier` y `GrabbedWorldPosition` a `ComputeEffectiveInertia`.
+
+Archivos/parametros:
+- `Assets/Scripts/RobotDynamics.cs`
+- `Assets/Scripts/GripperController.cs`
+- `Assets/Scripts/JoystickAdapter.cs`: nuevos campos `_gripperController`, `_payloadInertiaMultiplier`.
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: sección 5 ampliada ("Inercia simulada, muneca y carga (payload) agarrada").
+
+Resultado observado:
+- Pendiente de confirmación visual/interactiva en Unity Play Mode con un cubo `Agarrable` de masa alta vs. baja.
+- Validación de compilación: **no se pudo ejecutar**. Se intentó `dotnet build Assembly-CSharp.csproj --no-restore` pero no hay SDK de .NET instalado en el entorno (solo el runtime). Se intentó Unity batchmode (`Unity.exe -batchmode -quit -projectPath . -logFile ...` con la versión 6000.3.17f1, que coincide con `ProjectSettings/ProjectVersion.txt` actual) pero salió con código 1 de inmediato porque el Editor del usuario ya tenía el proyecto abierto (3 procesos `Unity.exe` activos) — mismo bloqueo de instancia múltiple documentado en la entrada del 2026-08-02 anterior. Se hizo revisión manual línea por línea de los tres archivos editados (firmas, tipos, paréntesis, uso de propiedades) sin encontrar errores evidentes, pero esto no reemplaza una compilación real.
+- Nota: la nueva firma de `ComputeEffectiveInertia` usa parámetros opcionales, por lo que no debería romper ningún otro caller existente aunque no se haya podido compilar.
+
+Decision:
+- Pendiente. No marcar como "integrado" hasta que el usuario confirme compilación limpia (recompilación automática del Editor abierto, revisando la Console) y valide en Play Mode que la velocidad de subida cambia de forma perceptible entre un cubo liviano y uno pesado, idealmente contrastando con `ControlDiagnosticRunner`/`RunVerticalSweep` (ya existente) para una comparación objetiva antes/después.
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: cambio aditivo y opt-in — `payloadMass` por defecto es `0`, así que sin objeto agarrado el cálculo de `jEff` es idéntico al anterior; no se tocaron `JointPID`, la generación del target cartesiano/IK, ni los límites de workspace/orientación.
+
+### 2026-08-02 (continuación) - Sin efecto perceptible pese a multiplicador x10; penalización de velocidad cartesiana por payload
+
+Sintoma:
+- Feedback del usuario: "No noto diferencia en la velocidad de subida aun subiendole el parametro de 1 a 10" (`_payloadInertiaMultiplier`).
+
+Análisis:
+- No era un problema de magnitud. `ApplyPID()` tiene un feedforward de velocidad (`feedforwardTorque = (jNorm/dt) * (qTargetVelocity*discreteDampingFactor - _jointVelocity[i])`) que luego se divide por `jNorm` en `acceleration = torque/jNorm`. El `jNorm` se cancela algebraicamente en ese término, dejándolo matemáticamente independiente de la inercia sin importar cuánta masa se sume. Solo el término PID puro (`Kp*error + Ki*integral + Kd*derivative`) se divide por `jNorm` sin cancelarse, pero es chico frente al feedforward cuando el seguimiento va razonablemente bien. Conclusión: el cambio anterior (sumar masa a `RobotDynamics.ComputeEffectiveInertia`) es físicamente correcto pero prácticamente inerte en este lazo de control concreto.
+
+Cambio probado:
+- Se agrega un segundo mecanismo, independiente del anterior: `payloadSpeedMultiplier` en `JoystickAdapter.FixedUpdate()`, calculado desde `_gripperController.GrabbedMass` y multiplicado directamente sobre `deltaWorld` (la velocidad cartesiana) junto a `driftSpeedMultiplier`, **antes** de la IK:
+  ```csharp
+  float payloadSpeedMultiplier = 1f;
+  if (_gripperController != null && _gripperController.IsHoldingObject)
+  {
+      float massRatio = Mathf.Clamp01(_gripperController.GrabbedMass / _maxSimulatedPayloadMass);
+      payloadSpeedMultiplier = Mathf.Lerp(1f, _minPayloadSpeedMultiplier, massRatio);
+  }
+  var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier);
+  ```
+- Se aplica sobre la trayectoria cartesiana completa (no por joint) para no repetir el bug documentado el 2026-06-29 ("Análisis de Límite de Velocidad vs. Trayectoria Cartesiana"): clampear velocidades articulares de forma independiente rompe la relación geométrica entre joints y corrompe la orientación del TCP. Al escalar `deltaWorld` antes de la IK, todos los joints ven la misma trayectoria recta, solo que más lenta.
+- Nuevos campos en `JoystickAdapter.cs`: `_maxSimulatedPayloadMass` (default `20f`, kg, referenciado al "Cubo Prueba" de Mass=20 visto en el Inspector del usuario) y `_minPayloadSpeedMultiplier` (default `0.25f`, piso para no bloquear al operador con cargas muy pesadas).
+- Se mantiene el cambio anterior (`RobotDynamics`/`_payloadInertiaMultiplier`) sin revertir: es inofensivo, sigue siendo físicamente correcto para el término PID puro y afecta transitorios/arranque, aunque no es el mecanismo que produce el efecto perceptible.
+
+Archivos/parametros:
+- `Assets/Scripts/JoystickAdapter.cs`: `_maxSimulatedPayloadMass`, `_minPayloadSpeedMultiplier`, `payloadSpeedMultiplier` en `FixedUpdate()`.
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: documentada la cancelación algebraica del feedforward sobre el término de inercia, y la nueva sección "Penalizacion de velocidad cartesiana por payload".
+
+Resultado observado:
+- Pendiente de confirmación en Unity Play Mode por el usuario.
+- Validación de compilación: no ejecutada por el mismo motivo que la entrada anterior (Editor del usuario abierto con el proyecto, sin SDK de .NET disponible en este entorno). Revisión manual del bloque insertado en `FixedUpdate()`: variables en scope correctas (`dt`, `_gripperController`, `_velocity`, `_speed` ya existían en el método), sin errores de sintaxis evidentes.
+
+Decision:
+- Pendiente de confirmación visual del usuario. Si `_maxSimulatedPayloadMass=20` con el "Cubo Prueba" (Mass=20) resulta demasiado agresivo o demasiado sutil, ajustar ese valor o `_minPayloadSpeedMultiplier` desde el Inspector sin tocar código.
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: cambio aditivo y opt-in — sin objeto agarrado, `payloadSpeedMultiplier = 1f` y el comportamiento es idéntico al anterior. No se tocaron `JointPID`, `RobotDynamics`, la generación de IK, ni los límites de workspace/orientación existentes.
