@@ -6079,6 +6079,8 @@ MonoBehaviour:
   _maxJointAcceleration: 720
   _gripperController: {fileID: 0}
   _payloadInertiaMultiplier: 5.14
+  _maxSimulatedPayloadMass: 20
+  _minPayloadSpeedMultiplier: 0.25
   _logIkPoseError: 1
   _ikPoseLogInterval: 0.25
   _j6MinLimit: -350
