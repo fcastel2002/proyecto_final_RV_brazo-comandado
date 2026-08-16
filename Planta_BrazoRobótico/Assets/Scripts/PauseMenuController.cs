@@ -20,6 +20,9 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private TextMeshProUGUI calibrationStatusText;
     [SerializeField] private GameObject futureOptionsContainer;
     [SerializeField] private Button orientationModeButton;
+    [SerializeField] private Button proximityThresholdButton;
+    [SerializeField] private Button descentMarginButton;
+    [SerializeField] private Button guideLengthButton;
     [SerializeField] private JoystickAdapter joystickAdapter;
 
     [Header("Menu Colors")]
@@ -93,6 +96,106 @@ public class PauseMenuController : MonoBehaviour
         }
     }
 
+    private void EnsureProximityThresholdButtonExists()
+    {
+        if (proximityThresholdButton != null) return;
+
+        Transform panel = pauseMenuRoot.transform.Find("Panel");
+        if (panel == null)
+        {
+            panel = pauseMenuRoot.GetComponentInChildren<VerticalLayoutGroup>()?.transform;
+        }
+
+        if (panel != null)
+        {
+            Transform existing = panel.Find("ProximityThresholdButton");
+            if (existing != null)
+            {
+                proximityThresholdButton = existing.GetComponent<Button>();
+            }
+            else
+            {
+                proximityThresholdButton = CreateButton(BuildProximityThresholdLabel(), panel);
+                proximityThresholdButton.gameObject.name = "ProximityThresholdButton";
+
+                if (continueButton != null)
+                {
+                    proximityThresholdButton.transform.SetSiblingIndex(continueButton.transform.GetSiblingIndex());
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Cicla el umbral de frenado por proximidad entre los presets. Se usa un boton ciclico y no
+    /// un Slider porque la navegacion izquierda/derecha del menu esta reservada a los botones de
+    /// perfil (ver FindNextSelectable).
+    /// </summary>
+    public void CycleProximityThreshold()
+    {
+        ProximitySlowdownSettings.CycleToNext();
+        UpdateProximityThresholdButtonText();
+    }
+
+    private void UpdateProximityThresholdButtonText()
+    {
+        if (proximityThresholdButton == null) return;
+
+        var text = proximityThresholdButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (text != null)
+            text.text = BuildProximityThresholdLabel();
+    }
+
+    private static string BuildProximityThresholdLabel()
+    {
+        return $"Frenado prox.: {ProximitySlowdownSettings.DescribeCurrent()}";
+    }
+
+    /// <summary>
+    /// Margen que se reserva por debajo del gripper cerrado. Es un valor propio y mucho mas corto que
+    /// el umbral de frenado: atarlo al umbral impediria depositar una pieza, porque el brazo se
+    /// frenaria a 30 cm del suelo.
+    /// </summary>
+    public void CycleDescentMargin()
+    {
+        ProximitySlowdownSettings.CycleDescentMarginToNext();
+        UpdateDescentMarginButtonText();
+    }
+
+    private void UpdateDescentMarginButtonText()
+    {
+        if (descentMarginButton == null) return;
+
+        var text = descentMarginButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (text != null)
+            text.text = BuildDescentMarginLabel();
+    }
+
+    private static string BuildDescentMarginLabel()
+    {
+        return $"Bloqueo desc.: {ProximitySlowdownSettings.DescribeDescentMargin()}";
+    }
+
+    public void CycleGuideLength()
+    {
+        GripperViewSettings.CycleGuideLengthToNext();
+        UpdateGuideLengthButtonText();
+    }
+
+    private void UpdateGuideLengthButtonText()
+    {
+        if (guideLengthButton == null) return;
+
+        var text = guideLengthButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (text != null)
+            text.text = BuildGuideLengthLabel();
+    }
+
+    private static string BuildGuideLengthLabel()
+    {
+        return $"Guías: {GripperViewSettings.DescribeGuideLength()}";
+    }
+
     public void ToggleOrientationMode()
     {
         if (joystickAdapter == null)
@@ -138,6 +241,7 @@ public class PauseMenuController : MonoBehaviour
         else
         {
             EnsureOrientationButtonExists();
+            EnsureProximityThresholdButtonExists();
         }
 
         WireButtons();
@@ -416,6 +520,15 @@ public class PauseMenuController : MonoBehaviour
 
         if (orientationModeButton != null)
             orientationModeButton.onClick.AddListener(ToggleOrientationMode);
+
+        if (proximityThresholdButton != null)
+            proximityThresholdButton.onClick.AddListener(CycleProximityThreshold);
+
+        if (descentMarginButton != null)
+            descentMarginButton.onClick.AddListener(CycleDescentMargin);
+
+        if (guideLengthButton != null)
+            guideLengthButton.onClick.AddListener(CycleGuideLength);
     }
 
     private void OnActiveProfileChanged(InputProfileSwitcher.InputProfileKind profile)
@@ -465,6 +578,9 @@ public class PauseMenuController : MonoBehaviour
         if (joystickAdapter == null)
             joystickAdapter = FindFirstObjectByType<JoystickAdapter>();
         UpdateOrientationButtonText();
+        UpdateProximityThresholdButtonText();
+        UpdateDescentMarginButtonText();
+        UpdateGuideLengthButtonText();
 
         if (EventSystem.current != null)
         {
@@ -561,6 +677,9 @@ public class PauseMenuController : MonoBehaviour
             finishCalibrationButton,
             resetCalibrationButton,
             orientationModeButton,
+            proximityThresholdButton,
+            descentMarginButton,
+            guideLengthButton,
             continueButton
         };
 
@@ -723,7 +842,9 @@ public class PauseMenuController : MonoBehaviour
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
         panelRect.pivot = new Vector2(0.5f, 0.5f);
         panelRect.anchoredPosition = Vector2.zero;
-        panelRect.sizeDelta = new Vector2(460f, 560f);
+        // 740 (y no 560) para que entren los tres botones de asistencia (frenado, bloqueo de
+        // descenso y guías) sin recortar 'Continuar'.
+        panelRect.sizeDelta = new Vector2(460f, 740f);
 
         var panelImage = panel.AddComponent<Image>();
         panelImage.color = panelColor;
@@ -773,6 +894,15 @@ public class PauseMenuController : MonoBehaviour
 
         orientationModeButton = CreateButton("Orientación: Fija Absoluta", panel.transform);
         orientationModeButton.gameObject.name = "OrientationButton";
+
+        proximityThresholdButton = CreateButton(BuildProximityThresholdLabel(), panel.transform);
+        proximityThresholdButton.gameObject.name = "ProximityThresholdButton";
+
+        descentMarginButton = CreateButton(BuildDescentMarginLabel(), panel.transform);
+        descentMarginButton.gameObject.name = "DescentMarginButton";
+
+        guideLengthButton = CreateButton(BuildGuideLengthLabel(), panel.transform);
+        guideLengthButton.gameObject.name = "GuideLengthButton";
 
         continueButton = CreateButton("Continuar", panel.transform);
     }
@@ -834,6 +964,9 @@ public class PauseMenuController : MonoBehaviour
         ApplyButtonColors(finishCalibrationButton);
         ApplyButtonColors(resetCalibrationButton);
         ApplyButtonColors(orientationModeButton);
+        ApplyButtonColors(proximityThresholdButton);
+        ApplyButtonColors(descentMarginButton);
+        ApplyButtonColors(guideLengthButton);
         RefreshSelectedTextColors();
     }
 
@@ -867,6 +1000,9 @@ public class PauseMenuController : MonoBehaviour
         SetButtonTextColor(finishCalibrationButton, selected);
         SetButtonTextColor(resetCalibrationButton, selected);
         SetButtonTextColor(orientationModeButton, selected);
+        SetButtonTextColor(proximityThresholdButton, selected);
+        SetButtonTextColor(descentMarginButton, selected);
+        SetButtonTextColor(guideLengthButton, selected);
     }
 
     private void SetButtonTextColor(Button button, GameObject selected)

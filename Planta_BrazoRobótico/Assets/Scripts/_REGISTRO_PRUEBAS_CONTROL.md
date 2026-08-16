@@ -713,3 +713,105 @@ Resultado observado:
 Decision:
 - Pendiente de confirmación visual del usuario. Si `_maxSimulatedPayloadMass=20` con el "Cubo Prueba" (Mass=20) resulta demasiado agresivo o demasiado sutil, ajustar ese valor o `_minPayloadSpeedMultiplier` desde el Inspector sin tocar código.
 - Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: cambio aditivo y opt-in — sin objeto agarrado, `payloadSpeedMultiplier = 1f` y el comportamiento es idéntico al anterior. No se tocaron `JointPID`, `RobotDynamics`, la generación de IK, ni los límites de workspace/orientación existentes.
+
+---
+
+### 2026-08-14 - Sensor inferior por SphereCast, distancia en la vista del gripper y frenado por proximidad
+
+Sintoma:
+- El sensor que apunta hacia abajo no trazaba rayos: aproximaba un cono con 8 `Physics.OverlapSphereNonAlloc` escalonadas. La `Distance` era euclidea al `ClosestPoint` (no una interseccion real) y la propiedad publica `Hit` nunca llegaba a asignarse.
+- La distancia se mostraba en `DistanceSensorValue`, un TMP suelto en la esquina inferior izquierda del Canvas: el operario tenia que apartar la mirada del recuadro de la gripper camera para leerla.
+- Nada frenaba el brazo por proximidad. `GripperDistanceSensor` no tenia ni una sola referencia fuera de su propio archivo; `JoystickAdapter` no lo conocia.
+
+Cambio probado:
+- `GripperDistanceSensor.cs`: nuevo `detectionMode` (`Cone` | `SphereCast`) **por instancia**, con default `Cone`. El cuerpo del muestreo en cono se extrajo tal cual a `MeasureWithCone()`. `MeasureWithSphereCast()` usa `Physics.SphereCastNonAlloc` con buffer (no un `SphereCast` simple) para poder descartar impactos contra el propio robot via el `CanDetect()` existente, y retrocede el origen `castRadius` sobre el eje para que un objeto ya solapado no devuelva distancia 0. `Distance` sigue siendo euclidea al punto de impacto, para que la lectura en mm no salte al cambiar de modo.
+- `GripperDistanceSensor.cs`: nueva propiedad `IsWithinSlowdownRange` con histeresis (`slowdownReleaseFactor`, 1.15) como **unica fuente de verdad** del frenado, consumida tanto por el color del HUD como por `JoystickAdapter`. Nuevo flag `contributesToSpeedReduction` para que solo el sensor inferior dispare el frenado.
+- `ProximitySlowdownSettings.cs` (nuevo): clase estatica con el umbral en metros, persistido en `PlayerPrefs`, presets `5/10/15/20/30 cm` + `Desactivado`. Vive fuera del adapter y del sensor a proposito: el adapter lee la distancia del sensor y el sensor lee el umbral; si el umbral viviera en cualquiera de los dos se referenciarian mutuamente.
+- `JoystickAdapter.cs`: `proximitySpeedMultiplier` (default `0.5f` = 50% mas lento) compuesto en la misma linea que `driftSpeedMultiplier * payloadSpeedMultiplier`, antes de la IK. `Awake()` autodescubre el sensor con `ContributesToSpeedReduction` si el campo quedo sin asignar, mismo patron que `_gripperController`. La telemetria JSON pasa a loguear el factor realmente aplicado.
+- `LeftLayoutManager.cs`: `DistanceSensorValue` se reparenta dentro de `CameraGripperView` (franja inferior, anclada por `offsetMin`/`offsetMax` para no desbordar, ya que el recuadro no tiene `RectMask2D`), con una banda oscura `DistanceValueBackdrop` detras para legibilidad sobre superficies claras. Se hizo por codigo y no editando la jerarquia del `.unity` a mano.
+- `PauseMenuController.cs`: boton ciclico "Frenado prox.: N cm". Se descarto un `Slider` porque `FindNextSelectable` reserva la navegacion izquierda/derecha a los botones de perfil y devuelve `null` en cualquier otro caso; el boton ciclico replica el patron ya existente de `OrientationButton` sin tocar la navegacion. Panel de 560 a 620 px de alto para que no se recorte "Continuar".
+
+Archivos/parametros:
+- `Assets/Scripts/ProximitySlowdownSettings.cs` (nuevo).
+- `Assets/Scripts/GripperDistanceSensor.cs`: `detectionMode`, `castRadius`, `contributesToSpeedReduction`, `slowdownReleaseFactor`, `colorizeDistanceText` + 4 colores.
+- `Assets/Scripts/JoystickAdapter.cs`: `_proximitySensor`, `_proximitySpeedMultiplier`.
+- `Assets/Scripts/LeftLayoutManager.cs`, `Assets/Scripts/PauseMenuController.cs`.
+- `Assets/Scenes/Planta.unity`: unicas claves nuevas, todas en el bloque del `DistanceSensor` (`&1424931422`): `detectionMode: 1`, `castRadius: 0.01`, `contributesToSpeedReduction: 1`, `slowdownReleaseFactor: 1.15`.
+
+Resultado observado:
+- Validacion de compilacion **ejecutada**: `Unity -batchmode -nographics -quit` con 6000.3.11f1 termina con "Exiting batchmode successfully now!" y cero `error CS`. Los dos unicos warnings en los archivos tocados (`_safetyDriftStartThreshold` / `_safetyDriftMaxTolerance` asignados y nunca usados) son **preexistentes**, residuo del sistema de drift desactivado.
+- Comportamiento en Play Mode: pendiente de confirmacion visual del usuario.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: cambio aditivo y opt-in. El multiplicador se aplica sobre la trayectoria cartesiana completa antes de la IK, nunca por joint en `ApplyPID()`, respetando la regla establecida el 2026-06-29. Con el umbral en `Desactivado` o sin objeto dentro del rango, `proximitySpeedMultiplier = 1f` y el comportamiento es identico al anterior. No se tocaron `JointPID`, `RobotDynamics`, la generacion de IK, ni los limites de workspace/orientacion.
+- Los 4 sensores laterales del prefab `OnRobot_RG2_Holder` quedan **sin modificar**: al no existir las claves nuevas en su YAML heredan `Cone` y `contributesToSpeedReduction = false` de los defaults del codigo, su `distanceText` es null (por lo que `UpdateUi()` sigue haciendo early-return y nunca colorean nada) y no se toco la vibracion. El prefab no aparece en el diff.
+- Limitacion conocida a revisar con el usuario: el sensor inferior tiene `detectionMask` = solo layer 3 `Manipulable`, asi que el frenado se dispara ante los cubos agarrables pero **no** ante el suelo o el entorno. Si se quisiera cubrir el entorno, es cambiar `m_Bits` en el bloque de escena; no se hizo por no alterar el comportamiento de deteccion vigente.
+
+---
+
+### 2026-08-14 (2) - Frenado progresivo, medicion con garra cerrada, bloqueo de descenso y guias ajustables
+
+Sintoma (feedback del usuario tras probar la entrada anterior en Play Mode):
+1. "No pareciese estar moviendose mas lento cuando estoy cerca".
+2. "Deja de medir la distancia cuando esta el gripper cerrado".
+3. Pedido nuevo: con la garra cerrada, no permitir bajar mas alla del umbral; solo subir.
+4. Pedido nuevo: poder ajustar el largo de las guias perpendiculares de la gripper camera ("se ven larguisimas pero no encuentro donde modificarlas").
+
+Diagnostico (medido, no supuesto):
+- **El frenado SI funcionaba.** Contrastado contra `Logs/control_diagnostics_log.json`: con `speedMult 0,500` el TCP recorria 0.0994 m en 0.1 s (0.995 m/s) y sin frenar 0.2077 m (2.08 m/s). Exactamente la mitad. Lo que fallaba era la **percepcion**: con `_speed` 1.99 m/s y umbral de 10 cm, la ventana dura ~100 ms (6 fotogramas a 60 FPS). Ademas `_velocity` no se normaliza, asi que en diagonal la velocidad real es 2.81 m/s y la ventana baja a 70 ms. Y el clamp de `_maxJointAcceleration` (720 °/s²) consume ~42 ms solo en bajar una articulacion de 60 a 30 °/s: media ventana gastada en la rampa.
+- **Causa raiz de la perdida de medicion**: `GripperController.GrabObject()` linea 195 hace `grabbedObject.transform.SetParent(parent)` y, como `graspPoint` esta a null en escena, `parent` acaba siendo el transform de `OnRobot_RG2`. El cubo pasa a colgar del robot y `CanDetect()` lo descarta por `IsChildOf(ignoredHierarchyRoot)`. **No tenia nada que ver con el SphereCast: con el modo cono ocurria igual.** Cerrar la garra sin llegar a agarrar no rompe nada (los dedos estan en layer 0, fuera de la mascara).
+- **Las guias** (`GuiaHorizontal` 512x2, `GuiaVertical` 2x512) son hijas fijas de `CameraGripperView` en el `.unity`, que mide ~270 px: desbordan casi el doble por cada lado. Ningun script las tocaba, por eso no habia donde ajustarlas.
+
+Cambio probado:
+- `GripperDistanceSensor.cs`: `IsWithinSlowdownRange` (booleano) se complementa con `ProximityFactor` continuo (0 en el umbral, 1 al contacto). El booleano queda solo para el HUD, con su histeresis, para que el indicador no parpadee. Nuevo `GetPayloadExtent()`: con una pieza agarrada se descuenta cuanto sobresale (proyeccion de los 8 vertices del AABB de sus colliders sobre el eje del sensor, con el `Collider[]` cacheado por objeto para no asignar por fotograma), de modo que la lectura pasa a ser el hueco libre BAJO la pieza. `IsGripDistanceSafe` se acota a colliders con tag `Agarrable`. `OnDisable()` resetea el estado de frenado.
+- `JoystickAdapter.cs`: el multiplicador pasa a `Mathf.Lerp(1f, _proximitySpeedMultiplier, ProximityFactor)`. Nuevo `ApplyDescentLimit()` que recorta la componente Y negativa de `deltaWorld` al hueco restante menos el margen. Nuevas propiedades `ProximitySpeedScale` e `IsDescentBlocked` para el HUD, limpiadas en `EndMotion()`, en la entrada a modo camara y en `SetInputSuppressed()`.
+- `GripperController.cs`: se exponen `IsGripperClosed` y `GrabbedObject` (solo getters sobre campos existentes, sin logica nueva).
+- `ProximitySlowdownSettings.cs`: umbral por defecto 10 -> **30 cm**, presets 10/20/30/40/50 cm + Desactivado. Segundo ajuste `DescentMarginMeters` (default 5 cm, presets 3/5/8/12 cm + Desactivado). La clave de PlayerPrefs del umbral se versiono a `.v2` para que quien ya tuviera 10 cm guardado no se quedase con el valor viejo. `CycleToNext()` busca el preset mas cercano en vez de exigir coincidencia exacta.
+- `GripperStatusOverlay.cs` (nuevo): chip sobre la vista con "DESCENSO BLOQUEADO" (prioritario, rojo) o "VELOCIDAD n%" (ambar), oculto cuando no hay nada que comunicar.
+- `GripperViewSettings.cs` (nuevo) + `LeftLayoutManager.cs`: largo de guias por anclas relativas al recuadro (dejan de desbordar y escalan solas), con presets Ocultas/25/50/75/Completa. Se cachean los `RectTransform` porque `GameObject.Find` no encuentra objetos inactivos y, una vez ocultas, no habria forma de recuperarlas.
+- `PauseMenuController.cs`: botones "Bloqueo desc.:" y "Guías:". Panel de 620 a 740 px.
+- `Assets/Scenes/Planta.unity`: `detectionMask.m_Bits` 8 -> **9** (Default + Manipulable) solo en el `DistanceSensor`.
+
+Archivos/parametros:
+- Nuevos: `Assets/Scripts/GripperStatusOverlay.cs`, `Assets/Scripts/GripperViewSettings.cs`.
+- Modificados: `GripperDistanceSensor.cs`, `JoystickAdapter.cs`, `GripperController.cs`, `ProximitySlowdownSettings.cs`, `LeftLayoutManager.cs`, `PauseMenuController.cs`, `Assets/Scenes/Planta.unity`.
+
+Resultado observado:
+- Validacion de compilacion: ver nota al pie de esta entrada.
+- Comportamiento en Play Mode: pendiente de confirmacion del usuario.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: el frenado sigue aplicandose sobre la trayectoria cartesiana completa antes de la IK, nunca por joint en `ApplyPID()`. El bloqueo de descenso se suma como **segundo mecanismo que altera `deltaWorld`**, junto al clamp de workspace ya existente, y opera en coordenadas de mundo antes de `WorldVectorToFrame` porque la vertical del input se compone como `Vector3.up * rawY`. No se tocaron `JointPID`, `RobotDynamics`, la generacion de IK ni los limites de workspace.
+- El margen de bloqueo se dejo como ajuste **independiente** del umbral de frenado (5 cm frente a 30 cm). Atarlos habria hecho imposible depositar una pieza: el brazo se frenaria a 30 cm del suelo y habria que soltarla desde esa altura.
+- Los 4 sensores laterales siguen sin modificarse (`Cone`, `contributesToSpeedReduction = false`, sin UI). El prefab `OnRobot_RG2_Holder.prefab` no aparece en el diff.
+
+**Hallazgo pendiente, a atacar por separado (NO se toco aqui):** J5/J6 viven saturados contra `_maxJointVelocity` (60 °/s) con 10-12° de drift de orientacion. La causa es que su `jNorm` cae siempre al piso de `0.05` (`JoystickAdapter.cs`, `ApplyPID`) porque `jEff` de los links 5 y 6 (7 kg y 0.5 kg con `ComLocal` en el propio eje) queda en ~0.01 kg·m² frente a `_referenceInertia: 5.39`. Eso les da 20x de autoridad PID y los mete en bang-bang, de modo que **la muñeca ignora cualquier multiplicador cartesiano**: por muy frenado que vaya el TCP, el gripper gira igual de rapido. Es un problema de ajuste preexistente e independiente de esta feature; corregirlo implica retocar `_referenceInertia` o la tabla de masas de `RobotDynamics`, y debe validarse con `RunVerticalSweep`.
+
+---
+
+### 2026-08-15 - Anticolision con el entorno: colliders y veto de movimiento
+
+Sintoma:
+- "El suelo y el entorno no colisionan con el brazo ni el gripper, no se si sera por el tag o por que".
+
+Diagnostico (dos causas independientes, ninguna relacionada con el tag ni con la layer):
+1. **No habia colliders en ninguna parte.** El prefab del KUKA tiene **0 colliders y 0 rigidbodies**: el brazo es geometria puramente visual. El prefab `OnRobot_RG2_Holder` tambien tiene 0 (los 4 de los dedos se anadieron sueltos en la escena). Y los prefabs del entorno industrial tienen 0, porque sus 55 FBX estan importados con `addColliders: 0`. **Activar "Generate Colliders" en el importador no habria servido**: la escena instancia los `.prefab` derivados del asset (p.ej. `Road_set_v1_b_floor.prefab`, con 15 instancias — ese es el suelo), que son assets distintos de los FBX y no heredan esa opcion.
+2. **Aunque los hubiera, el brazo los atravesaria igual.** Se mueve por `SetJoints()` (pose cinematica), y Unity no resuelve penetracion en objetos movidos por transform. La colision fisica resuelta esta fuera de alcance por diseno: `_ARQUITECTURA_CONTROL.md` prohibe mover el brazo con Rigidbody o fuerzas.
+
+Contexto de escenas aclarado con el usuario: trabaja con **multi-scene editing**, `Planta.unity` (robot, HUD, managers) y `Map_v2.unity` (entorno) cargadas a la vez. En disco cada escena solo tiene su mitad. **Build Settings solo contiene `Planta.unity`**, asi que en una build el entorno no existiria: queda pendiente consolidar o anadir `Map_v2` a Build Settings.
+
+Cambio probado:
+- `Assets/Editor/EnvironmentColliderTool.cs` (nuevo): menu `Tools > Entorno`. Recorre **todas las escenas cargadas** (necesario por el multi-scene), anade `MeshCollider` a los objetos con `MeshFilter` que no tengan collider, y los pasa a la layer **`Entorno` (6)**, que estaba definida y sin usar. Omite el robot, el gripper, los sensores, las piezas agarrables y la UI. Reversible con Undo y con un menu inverso.
+- `JoystickAdapter.ApplyCollisionVeto()`: barrido `SphereCastNonAlloc` del volumen aproximado del gripper a lo largo de `deltaWorld`, recortando el paso al hueco libre menos la holgura. Se ignoran los solapamientos en el origen (si no, un gripper ya penetrado quedaria congelado sin salida) y las superficies horizontales (las gobierna el bloqueo de descenso; vetarlas aqui frenaria el gripper a ~12 cm del piso e impediria recoger piezas).
+- `GripperStatusOverlay`: nuevo aviso "OBSTACULO".
+- `Assets/Scenes/Planta.unity`: `detectionMask.m_Bits` a **73** (Default + Manipulable + Entorno), para que el sensor siga viendo el entorno tanto antes como despues de ejecutar la herramienta.
+
+Resultado observado:
+- Compilacion **ejecutada** con Roslyn (`DotNetSdkRoslyn/csc.dll`) contra los response files que genera Unity, porque el Editor del usuario tenia el lock del proyecto y el batchmode no podia arrancar: `Assembly-CSharp` exit 0 y `Assembly-CSharp-Editor` (incluyendo el archivo nuevo) exit 0. Unicos warnings, los dos `CS0414` preexistentes.
+- Comportamiento en Play Mode: pendiente. **La herramienta de colliders no se ha ejecutado todavia**; hasta entonces el veto no actua (su mascara por defecto es solo `Entorno`, que esta vacia).
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: el veto se aplica sobre la trayectoria cartesiana antes de la IK, nunca por joint, igual que el clamp de workspace y el bloqueo de descenso. No se toco `JointPID`, `RobotDynamics` ni la generacion de IK. No se anadio Rigidbody ni fuerzas al brazo.
+- Alcance conocido y aceptado: **solo se vigila el volumen del gripper**. Los eslabones altos (codo, antebrazo) pueden seguir atravesando geometria; cubrirlos exigiria colliders por eslabon y un barrido por cada uno.
+
+**Incidencia de trabajo a tener presente:** el Editor del usuario tenia `Planta.unity` cargada con cambios sin guardar mientras se editaba el mismo archivo en disco. Al guardar, Unity sobrescribio la edicion de `detectionMask` (volvio de 9 a 8) conservando el resto. Antes de editar la escena por fuera del Editor, hay que asegurarse de que no este cargada y sucia, o reaplicar y verificar despues.

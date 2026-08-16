@@ -44,6 +44,18 @@ public class GripperController : MonoBehaviour
 
 	public bool IsHoldingObject => grabbedObject != null;
 
+	/// <summary>
+	/// Intencion de cierre de la garra, independiente de si llego a agarrar algo. Arranca en true.
+	/// La consume JoystickAdapter para bloquear el descenso con la garra cerrada.
+	/// </summary>
+	public bool IsGripperClosed => isGripperClosed;
+
+	/// <summary>
+	/// Objeto actualmente agarrado, o null. Lo usa GripperDistanceSensor para descontar el volumen
+	/// de la pieza transportada y medir el hueco libre por debajo de ella.
+	/// </summary>
+	public GameObject GrabbedObject => grabbedObject;
+
 	/// <summary>Masa original (kg) del objeto actualmente agarrado, o 0 si no hay ninguno.</summary>
 	public float GrabbedMass => grabbedObject != null ? originalMass : 0f;
 
