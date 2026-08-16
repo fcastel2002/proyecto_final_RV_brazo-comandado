@@ -815,3 +815,69 @@ Decision:
 - Alcance conocido y aceptado: **solo se vigila el volumen del gripper**. Los eslabones altos (codo, antebrazo) pueden seguir atravesando geometria; cubrirlos exigiria colliders por eslabon y un barrido por cada uno.
 
 **Incidencia de trabajo a tener presente:** el Editor del usuario tenia `Planta.unity` cargada con cambios sin guardar mientras se editaba el mismo archivo en disco. Al guardar, Unity sobrescribio la edicion de `detectionMask` (volvio de 9 a 8) conservando el resto. Antes de editar la escena por fuera del Editor, hay que asegurarse de que no este cargada y sucia, o reaplicar y verificar despues.
+
+---
+
+### 2026-08-16 - Robustez del agarre: suelta diferida, estado del payload y compilacion de build
+
+Origen:
+- Pedido del usuario: revisar que se podria mejorar del agarre sin cambios profundos, y aplicar el primer bloque (bugs de pocas lineas). No se toco nada fuera de la cadena de agarre.
+
+Sintomas / hallazgos (revision de codigo, no reportados en Play Mode):
+1. **La pieza se soltaba antes de que los dedos abrieran.** `ToggleGrip()` llamaba a `ReleaseObject()` en el mismo frame en que el animator recien arrancaba la apertura, asi que la pieza volvia a ser dinamica con los dedos todavia cerrados encima: Unity resuelve esa penetracion y la pieza salta, vibra o sale disparada de costado.
+2. **`originalMass` se arrastraba entre agarres.** Si la pieza agarrada no tenia `Rigidbody`, nunca se asignaba, pero `GrabbedMass` la devolvia igual (solo comprobaba `grabbedObject != null`): la inercia efectiva y el `payloadSpeedMultiplier` usaban la masa de la pieza *anterior*.
+3. **Deriva de masa del gripper.** El par `gripperRigidbody.mass += / -=` acumula error permanente si algun agarre y su suelta no se emparejan (p.ej. si la pieza se destruye mientras esta tomada).
+4. **No se guardaba el `isKinematic` previo de la pieza:** una pieza que ya fuera cinematica quedaba dinamica al soltarla.
+5. **La build standalone no compilaba, por dos motivos independientes en el mismo par de archivos:** `using UnityEditor;` sin guarda en `Ctrl_OnRobot_RG2_Custom.cs`, y `GripperController` escribiendo `gripperAnimator.in_position`, que fuera del Editor es `private`. En el Editor esto no se nota nunca.
+6. **Logs de trigger activos por defecto** (`debugTriggers`, `debug`): escriben en consola en cada entrada/salida de contacto.
+
+Cambio probado:
+- `Ctrl_OnRobot_RG2_Custom.cs`: `using UnityEditor;` envuelto en `#if UNITY_EDITOR`. Nueva interfaz publica de solo lectura `OpeningFraction` (apertura normalizada contra el angulo de `s_max`, evaluado una sola vez y cacheado en `__theta_max`) e `IsInPosition`, mas `StopMotion()` para encapsular la parada de la animacion sin tocar `in_position` desde fuera.
+- `GripperController.cs`: suelta diferida (`BeginRelease` / `UpdatePendingRelease`, llamada desde `FixedUpdate`) con `releaseOpeningDelta` (default `0.2`) y `releaseTimeout` (default `1 s`, fuerza la suelta con warning si la animacion no avanza). Volver a cerrar durante la espera cancela la suelta y mantiene el agarre.
+  - **Correccion durante la propia implementacion, vale la pena registrarla:** el umbral se planteo primero como apertura absoluta (`releaseOpeningFraction >= 0.35`). Estaba mal: al agarrar, `StopMotion()` deja los dedos detenidos apoyados sobre la pieza, asi que una pieza ancha arranca la suelta con `OpeningFraction` ya por encima del umbral y liberaba en el primer tick — el bug original habria seguido vivo justo en las piezas grandes, que son las que peor saltan. La condicion final (`HaveFingersClearedPayload`) mide el **incremento** de apertura desde el instante de la orden, con `IsInPosition` como caso limite para piezas casi tan anchas como la carrera del RG2. `RefreshGripperMass()` reasigna `base + payload` en vez de acumular. Se guardan y restauran `originalMass` y `grabbedWasKinematic`; `originalMass = 0` explicito cuando no hay `Rigidbody`. El reset de estado y la masa se aplican fuera del `if (grabbedObject != null)` para cubrir la pieza destruida. `debugTriggers` por defecto a `false`.
+- `GripperTriggerForwarder.cs`: `debug` por defecto a `false`.
+
+Archivos tocados:
+- `Assets/Scripts/GripperController.cs`
+- `Assets/Scripts/Ctrl_OnRobot_RG2_Custom.cs`
+- `Assets/Scripts/GripperTriggerForwarder.cs`
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: nueva subseccion "Ciclo de agarre y suelta" y nota en la seccion 5.
+
+Resultado observado:
+- Compilacion **ejecutada**, dos veces, con `dotnet build` sobre el `Assembly-CSharp.csproj` que genera Unity (el batchmode no podia arrancar: el Editor del usuario tenia el lock del proyecto). Salida redirigida al scratchpad para no ensuciar el repo; `git status` confirma que solo quedaron modificados los archivos editados.
+  - Con los defines tal cual (incluyen `UNITY_EDITOR`): **0 errores**, unicos warnings los dos `CS0414` preexistentes de `JoystickAdapter`.
+  - Con los defines **sin `UNITY_EDITOR`** (simula build de player, que es el caso que estaba roto): **0 errores**. Aparecen 3 `CS0414` mas, todos preexistentes y ajenos a este cambio: el `in_position` privado de `Ctrl_ABB_SG`, `Ctrl_OnRobot_RG2` y `Ctrl_Robotiq_2F_85` (scripts originales del asset en `Assets/AssetsGripper/Script/`) queda sin uso al no compilarse el bloque de Editor.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**. En particular queda por confirmar en VR si `releaseOpeningDelta = 0.2` (~13° de apertura, ~0.07 s a la velocidad por defecto de 180) se siente inmediato al soltar o si conviene bajarlo.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: no se toco `JointPID`, `RobotDynamics`, la generacion de IK ni los limites de workspace/orientacion. El brazo sigue sin moverse por `Rigidbody` ni fuerzas. El unico efecto sobre la cadena de control es que, durante la suelta pendiente, `IsHoldingObject` sigue en `true` unos ~0.13 s mas, asi que la inercia y la penalizacion de velocidad por payload se descuentan al liberar la pieza y no al pulsar el boton (mas fiel a la fisica, no menos).
+- `debugTriggers` y `debug` se cambiaron solo en el **valor por defecto del script**. Las instancias ya presentes en la escena conservan el `true` serializado: hay que desmarcarlos a mano en el Inspector para que surta efecto.
+- Fuera de alcance, propuesto y no aplicado (bloques 2 y 3 de la revision): eleccion de la pieza mas cercana al `graspPoint` en vez de la primera del diccionario, incluir los bounds de la pieza agarrada en `ApplyCollisionVeto` (hoy se la puede empotrar lateralmente), herencia opcional de la velocidad del brazo al soltar, verificacion de escala del `graspPoint`, y feedback haptico/HUD al confirmar el agarre.
+
+---
+
+### 2026-08-16 (2) - Boton "Modo debug" en el menu de pausa
+
+Origen:
+- Pedido del usuario, a continuacion de la entrada anterior. Ahi habian quedado `debugTriggers` y `debug` en `false` por defecto, con la limitacion de que cambiarlos exige salir de Play Mode y tocar el Inspector componente por componente. `GrabbableSafetyGuard.logRecoveries` era peor: ese componente se auto-anade por codigo (`RuntimeInitializeOnLoadMethod`), asi que no tiene Inspector donde editarlo.
+
+Cambio probado:
+- `DebugSettings.cs` (nuevo): estatico con `PlayerPrefs`, mismo patron que `ProximitySlowdownSettings` y `GripperViewSettings`. `IsEnabled`, `SetEnabled`, `Toggle()`, `Describe()` y evento `EnabledChanged`. Default **apagado**: la consola arranca limpia y encenderlo es una accion explicita.
+- Consumidores: `GripperController` y `GripperTriggerForwarder` ganan una propiedad `LogEnabled => flagLocal || DebugSettings.IsEnabled`; `GrabbableSafetyGuard` evalua `logRecoveries || DebugSettings.IsEnabled` y su flag pasa a default `false` (antes logueaba siempre). **Los flags del Inspector se conservan como override por componente**, para poder aislar uno solo mientras se depura sin llenar la consola con el resto.
+- `PauseMenuController.cs`: nuevo `debugModeButton` con el ciclo completo del patron existente — campo `[SerializeField]`, `EnsureDebugModeButtonExists()` (para la escena que ya trae el panel armado), `ToggleDebugMode()` / `UpdateDebugModeButtonText()` / `BuildDebugModeLabel()`, alta en `WireButtons`, `ApplyButtonColors`, `RefreshSelectedTextColors`, `UpdateProfileUi`, el array de orden de `FindNextSelectable` (entre guias y Continuar) y `BuildDefaultMenu`. Altura del panel por defecto de 740 a 798 (46 de alto + 12 de spacing por boton).
+
+Archivos tocados:
+- `Assets/Scripts/DebugSettings.cs` (nuevo)
+- `Assets/Scripts/PauseMenuController.cs`
+- `Assets/Scripts/GripperController.cs`, `Assets/Scripts/GripperTriggerForwarder.cs`, `Assets/Scripts/GrabbableSafetyGuard.cs`
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: fila de `DebugSettings.cs` en la tabla de scripts.
+
+Resultado observado:
+- Compilacion **ejecutada**, con y sin `UNITY_EDITOR`: **0 errores** en ambos perfiles, mismos warnings preexistentes que en la entrada anterior (2 y 5 `CS0414`).
+- **Detalle de metodo a recordar:** el `Assembly-CSharp.csproj` que genera Unity enumera los `.cs` uno por uno, asi que un archivo **nuevo** no entra en la compilacion hasta que Unity regenera el proyecto. Hubo que anadir su `<Compile Include>` a mano para poder validar. El csproj esta en `.gitignore` (`*.csproj`) y Unity lo regenera al recompilar, asi que la edicion es transitoria e inocua.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**.
+
+Decision:
+- Alcance del "modo debug": solo **logs de runtime** de la cadena de agarre y de la recuperacion de piezas. Quedan deliberadamente fuera `GripperDistanceSensor.drawGizmos` (los gizmos solo se ven en la Scene view del Editor, no en Play ni en VR, asi que un boton en el menu de pausa no los alcanza) y `JoystickVibrationHidOutput.logConnection` (un unico log al conectar, diagnostico util siempre).
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: no toca la cadena de control. Solo condiciona llamadas a `Debug.Log`.
+- **A verificar en el Editor:** si `pauseMenuRoot` esta asignado en la escena, `EnsureDebugModeButtonExists()` inyecta el boton en el `Panel` existente. Si ese panel tiene altura fija en el `.unity` (y no un Content Size Fitter), puede que haya que subirla a mano para que no recorte "Continuar", igual que se hizo con la altura por defecto del menu construido por codigo.

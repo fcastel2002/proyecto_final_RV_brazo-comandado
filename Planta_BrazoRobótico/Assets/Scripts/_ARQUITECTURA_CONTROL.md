@@ -319,8 +319,10 @@ Acepta dos parametros opcionales, `payloadMass` y `payloadWorldPos`. Si `payload
 
 Expone de solo lectura:
 
-- `GrabbedMass`: masa original (kg) del objeto actualmente agarrado, o `0` si no hay ninguno.
+- `GrabbedMass`: masa original (kg) del objeto actualmente agarrado, o `0` si no hay ninguno (tambien `0` si la pieza no tiene `Rigidbody`).
 - `GrabbedWorldPosition`: posicion mundial del `graspPoint`, rigidamente ligado al objeto agarrado mientras esta tomado.
+
+Ver tambien "Ciclo de agarre y suelta" mas abajo: durante una suelta pendiente `IsHoldingObject` sigue en `true`, de modo que la carga se descuenta de la inercia recien cuando la pieza vuelve a la fisica (~0.07 s despues de pulsar el boton, con los valores por defecto).
 
 **Archivo:** `Assets/Scripts/JoystickAdapter.cs`
 
@@ -479,6 +481,24 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 
 ---
 
+### Ciclo de agarre y suelta (2026-08-16)
+
+**Archivos:** `Assets/Scripts/GripperController.cs`, `Assets/Scripts/Ctrl_OnRobot_RG2_Custom.cs`.
+
+El agarre se confirma solo si, **durante una orden explicita de cierre** (`isClosing`), la misma pieza toca las caras internas de **ambos** dedos (`HasOpposingInnerContacts`). Tocar un objeto con la garra ya cerrada nunca lo adhiere. Al confirmar, la pieza pasa a cinematica y se emparenta al `graspPoint`.
+
+**La suelta es diferida, no inmediata.** `ToggleGrip()` a abierto solo marca `isReleasing`; la devolucion real a la fisica ocurre en `FixedUpdate()` (`UpdatePendingRelease`). Motivo: si la pieza vuelve a ser dinamica con los dedos todavia cerrados encima, Unity resuelve esa penetracion y la pieza salta o sale disparada de costado.
+
+La condicion (`HaveFingersClearedPayload`) es un **incremento** de apertura, `releaseOpeningDelta` (0-1, default `0.2`), medido desde la apertura que los dedos tenian al ordenar la suelta — **no** un umbral absoluto. Al agarrar, `StopMotion()` deja los dedos detenidos apoyados sobre la pieza, asi que una pieza ancha arranca la suelta con `OpeningFraction` ya alta y un umbral absoluto se cumpliria en el primer tick, que es justo lo que hay que evitar. Como caso limite (pieza casi tan ancha como la carrera del RG2, donde ese incremento no cabe) tambien basta con `IsInPosition` y apertura mayor que la inicial. Un `releaseTimeout` (default `1 s`) fuerza la suelta con warning si la animacion no avanza, para que la pieza nunca quede pegada. Si se vuelve a cerrar antes de que se cumpla la condicion, la suelta pendiente se cancela y el agarre se mantiene.
+
+Mientras dura la suelta pendiente, `IsHoldingObject` sigue en `true`: la inercia y la penalizacion de velocidad por payload se mantienen hasta que la pieza realmente se libera. `IsGripperClosed`, en cambio, pasa a `false` de inmediato (refleja la intencion del operario y libera el bloqueo de descenso).
+
+**Masa del gripper.** `RefreshGripperMass()` reasigna `gripperRigidbody.mass = gripperBaseMass + GrabbedMass` (con `gripperBaseMass` cacheado en `Awake()`), en vez de acumular `mass +=` / `mass -=`, que derivaba si un agarre y su suelta no se emparejaban. `originalMass` y el `isKinematic` previo de la pieza se guardan al agarrar y se restauran tal cual al soltar; si la pieza no tiene `Rigidbody`, `originalMass` se pone a `0` explicitamente (antes conservaba la masa de la pieza anterior y falseaba `jEff` y `payloadSpeedMultiplier`).
+
+**Interfaz publica de `Ctrl_OnRobotRG2_Custom`** usada por `GripperController`: `OpeningFraction` (0 = cerrado, 1 = abierto, normalizada contra el angulo de `s_max` del polinomio del RG2), `IsInPosition` y `StopMotion()`. `in_position` es `public` solo bajo `#if UNITY_EDITOR`, asi que escribirlo directamente rompia la compilacion de cualquier build standalone; `StopMotion()` existe para encapsularlo.
+
+---
+
 ## 6. Resets de estado
 
 | Evento | Accion actual |
@@ -501,6 +521,7 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 | `GripperDistanceSensor.cs` | Sensor de distancia del gripper (modo `Cone` en los laterales, `SphereCast` en el inferior) | **Entrada de la cadena de control**: el sensor inferior expone `IsWithinSlowdownRange`, que `JoystickAdapter` usa como `proximitySpeedMultiplier` |
 | `ProximitySlowdownSettings.cs` | Umbral de frenado y margen de bloqueo de descenso (estatico, persistido en `PlayerPrefs`, editable desde el menu de pausa) | Parametros de la asistencia por proximidad |
 | `GripperViewSettings.cs` | Largo de las guias perpendiculares de la gripper camera (estatico, `PlayerPrefs`, menu de pausa) | UI General |
+| `DebugSettings.cs` | Modo debug global: enciende/apaga en caliente los logs de diagnostico (estatico, `PlayerPrefs`, menu de pausa). Lo consultan `GripperController`, `GripperTriggerForwarder` y `GrabbableSafetyGuard`; sus flags `[SerializeField]` locales siguen actuando como override por componente | Independiente de la cadena de control |
 | `GripperStatusOverlay.cs` | Aviso sobre la vista del gripper: "DESCENSO BLOQUEADO" / "VELOCIDAD n%". Se autoinstancia, patron de `J6OverlayController` | Lee `JoystickAdapter.IsDescentBlocked` y `ProximitySpeedScale` |
 | `GripperTopCameraFollow.cs` | Camara superior del gripper | Independiente |
 | `GripperTriggerForwarder.cs` | Reenvio de triggers | Independiente |

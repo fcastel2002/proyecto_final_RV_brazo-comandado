@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "1218ec5e34e0d0638c03c3acda6b68a65a958f28",
-    "indexed_at": "2026-08-16T03:35:36Z",
+    "commit": "3da6040dbfcac04eaca74a11ca17744fcc20480d",
+    "indexed_at": "2026-08-16T22:05:38Z",
     "project": "D-06.-Proyectos-proyecto_final_RV_brazo-comandado",
-    "nodes": 52950,
-    "edges": 100552,
-    "original_size": 134283264,
-    "compressed_size": 17036084,
+    "nodes": 53010,
+    "edges": 100741,
+    "original_size": 134545408,
+    "compressed_size": 17050503,
     "compression_level": 3
 }
