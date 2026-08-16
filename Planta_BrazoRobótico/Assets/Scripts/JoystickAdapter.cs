@@ -91,6 +91,33 @@ public class JoystickAdapter : MonoBehaviour
     [Tooltip("Fracción mínima de velocidad cartesiana permitida al cargar el objeto más pesado soportado (nunca 0, para no bloquear al operador).")]
     [SerializeField, Range(0.05f, 1f)] private float _minPayloadSpeedMultiplier = 0.25f;
 
+    [Header("Frenado por proximidad")]
+    [Tooltip("Sensor que dispara el frenado. Si se deja vacío se busca en escena el primero con 'Contributes To Speed Reduction' activo (el sensor inferior).")]
+    [SerializeField] private GripperDistanceSensor _proximitySensor;
+    [Tooltip("Fracción de velocidad cartesiana al que se llega pegado al objeto. 0.5 = 50% más lento. La transición desde el umbral es progresiva, no un escalón.")]
+    [SerializeField, Range(0.1f, 1f)] private float _proximitySpeedMultiplier = 0.5f;
+
+    /// <summary>Multiplicador de proximidad realmente aplicado en el último tick. 1 = sin frenado.</summary>
+    public float ProximitySpeedScale { get; private set; } = 1f;
+
+    /// <summary>true si el descenso está siendo limitado por el margen de seguridad del gripper cerrado.</summary>
+    public bool IsDescentBlocked { get; private set; }
+
+    [Header("Anticolisión con el entorno")]
+    [Tooltip("Frena el brazo antes de penetrar un obstáculo. El robot se mueve por cinemática, no por Physics, así que los colliders no lo detienen solos: hace falta este veto por software.")]
+    [SerializeField] private bool _enableCollisionVeto = true;
+    [Tooltip("Layers consideradas obstáculo. Por defecto solo 'Entorno' (6): hasta que no se ejecute Tools > Entorno > Generar colliders faltantes, el veto no actúa y nada cambia.")]
+    [SerializeField] private LayerMask _obstacleMask = 1 << 6;
+    [Tooltip("Radio del volumen aproximado del gripper usado para el barrido anticolisión (m).")]
+    [SerializeField, Min(0.01f)] private float _collisionProbeRadius = 0.10f;
+    [Tooltip("Holgura que se deja frente al obstáculo (m).")]
+    [SerializeField, Min(0f)] private float _collisionClearance = 0.02f;
+    [Tooltip("Se ignoran las superficies cuya normal apunte hacia arriba más que este valor (suelos, tapas de palés): el descenso lo gobierna el bloqueo del gripper cerrado, y vetarlo aquí impediría bajar a recoger piezas.")]
+    [SerializeField, Range(0f, 1f)] private float _floorNormalThreshold = 0.7f;
+
+    /// <summary>true si el avance está siendo recortado por un obstáculo del entorno.</summary>
+    public bool IsMotionBlocked { get; private set; }
+
     [Header("Diagnostico IK")]
     [Tooltip("Loguea error entre el target cartesiano enviado a IK y la FK de solution.JointTarget.")]
     [SerializeField] private bool _logIkPoseError = true;
@@ -191,6 +218,8 @@ public class JoystickAdapter : MonoBehaviour
     private float _prevStickAngle;
     private bool _hasUnwrappedStickAngle;
     private readonly float[] _lastJointControlActions = new float[6];
+    private readonly RaycastHit[] _collisionBuffer = new RaycastHit[32];
+    private Transform _robotRoot;
 
     public float[] LastJointControlActions => _lastJointControlActions;
 
@@ -201,6 +230,16 @@ public class JoystickAdapter : MonoBehaviour
 
         if (_gripperController == null)
             _gripperController = FindFirstObjectByType<GripperController>();
+
+        if (_proximitySensor == null)
+            _proximitySensor = FindSpeedReductionSensor();
+
+        // Raíz de la jerarquía del robot: se usa para descartar sus propias piezas (y la pieza
+        // agarrada, que pasa a colgar del gripper) en el barrido anticolisión.
+        if (_gripperController != null)
+            _robotRoot = _gripperController.transform.root;
+        else if (_endEffector != null)
+            _robotRoot = _endEffector.root;
 
         if (Application.isBatchMode)
         {
@@ -216,6 +255,124 @@ public class JoystickAdapter : MonoBehaviour
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// En escena conviven varios GripperDistanceSensor (el inferior y los laterales del gripper).
+    /// Solo el que tenga marcado ContributesToSpeedReduction debe frenar el brazo: los laterales
+    /// ven el suelo a 0.4 m y dejarían el robot permanentemente al 50%.
+    /// </summary>
+    private static GripperDistanceSensor FindSpeedReductionSensor()
+    {
+        GripperDistanceSensor[] sensors = FindObjectsByType<GripperDistanceSensor>(FindObjectsSortMode.None);
+        for (int i = 0; i < sensors.Length; i++)
+        {
+            if (sensors[i] != null && sensors[i].ContributesToSpeedReduction)
+                return sensors[i];
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Con la garra cerrada, impide seguir bajando por debajo del margen de seguridad configurado.
+    /// Subir nunca se limita. Se aplica en coordenadas de mundo y ANTES de WorldVectorToFrame porque
+    /// la componente vertical del input se compone como Vector3.up * rawY, también en mundo.
+    /// El paso se recorta al margen restante en vez de cortarse en seco, para que el brazo se detenga
+    /// justo sobre el margen en lugar de pasarse un tick.
+    /// </summary>
+    private void ApplyDescentLimit(ref Vector3 deltaWorld)
+    {
+        IsDescentBlocked = false;
+
+        if (deltaWorld.y >= 0f) return;
+        if (!ProximitySlowdownSettings.IsDescentBlockEnabled) return;
+        if (_gripperController == null || !_gripperController.IsGripperClosed) return;
+        if (_proximitySensor == null || !_proximitySensor.HasHit) return;
+
+        float allowedDescent = Mathf.Max(
+            0f,
+            _proximitySensor.Distance - ProximitySlowdownSettings.DescentMarginMeters);
+
+        if (deltaWorld.y >= -allowedDescent) return;
+
+        deltaWorld.y = -allowedDescent;
+        IsDescentBlocked = true;
+    }
+
+    /// <summary>
+    /// Recorta el paso cartesiano para que el gripper no penetre la geometría del entorno.
+    ///
+    /// El brazo se mueve asignando ángulos articulares (Flange), no con Rigidbody ni fuerzas, así que
+    /// Unity NO resuelve la penetración: los colliders del entorno reportan contactos pero no detienen
+    /// nada. Este veto por software es la única forma de frenarlo respetando la arquitectura de control,
+    /// y sigue el mismo patrón que el clamp de workspace y el bloqueo de descenso: se aplica sobre la
+    /// trayectoria cartesiana antes de la IK, nunca por joint.
+    /// </summary>
+    private void ApplyCollisionVeto(ref Vector3 deltaWorld)
+    {
+        IsMotionBlocked = false;
+
+        if (!_enableCollisionVeto || _endEffector == null) return;
+
+        float stepDistance = deltaWorld.magnitude;
+        if (stepDistance <= 1e-6f) return;
+
+        Vector3 direction = deltaWorld / stepDistance;
+        float castDistance = stepDistance + _collisionClearance;
+
+        int hitCount = Physics.SphereCastNonAlloc(
+            _endEffector.position,
+            _collisionProbeRadius,
+            direction,
+            _collisionBuffer,
+            castDistance,
+            _obstacleMask,
+            QueryTriggerInteraction.Ignore);
+
+        float nearest = float.MaxValue;
+        for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
+        {
+            RaycastHit hit = _collisionBuffer[hitIndex];
+
+            // Solapamiento en el origen: Unity devuelve distancia 0. Si lo tomásemos como obstáculo,
+            // el brazo quedaría congelado sin forma de salir. Se ignora para que el operador pueda
+            // retroceder.
+            if (hit.distance <= 1e-4f) continue;
+            if (!IsObstacle(hit.collider)) continue;
+
+            // Suelos y superficies horizontales: las gobierna el bloqueo de descenso, que es preciso
+            // y tiene en cuenta la pieza transportada. Vetarlas aquí impediría bajar a recoger.
+            if (Vector3.Dot(hit.normal, Vector3.up) > _floorNormalThreshold) continue;
+
+            if (hit.distance < nearest)
+                nearest = hit.distance;
+        }
+
+        if (nearest == float.MaxValue) return;
+
+        float allowedStep = Mathf.Max(0f, nearest - _collisionClearance);
+        if (allowedStep >= stepDistance) return;
+
+        deltaWorld = direction * allowedStep;
+        IsMotionBlocked = true;
+    }
+
+    /// <summary>
+    /// Descarta el propio robot y la pieza agarrada (que al agarrarse pasa a colgar del gripper).
+    /// </summary>
+    private bool IsObstacle(Collider candidate)
+    {
+        if (candidate == null || !candidate.enabled) return false;
+
+        return _robotRoot == null || !candidate.transform.IsChildOf(_robotRoot);
+    }
+
+    private void ClearAssistanceState()
+    {
+        ProximitySpeedScale = 1f;
+        IsDescentBlocked = false;
+        IsMotionBlocked = false;
     }
 
     private void OnEnable()
@@ -436,6 +593,7 @@ public class JoystickAdapter : MonoBehaviour
         {
             _velocity = Vector3.zero;
             ResetPIDs();
+            ClearAssistanceState();
             _motionActive = false;
             ClearJointActionDisplay();
         }
@@ -512,7 +670,14 @@ public class JoystickAdapter : MonoBehaviour
             Debug.Log($"[JoystickAdapter][Debug] FixedUpdate #{_fixedUpdateCount}: IsValid={(_controller != null ? _controller.IsValid.Value.ToString() : "null")}, Velocity={_velocity.magnitude:F3}, MotionActive={_motionActive}, OrientationCaptured={_orientationCaptured}");
         }
 
-        if (IsCameraMode) return;
+        if (IsCameraMode)
+        {
+            // Sin esto los avisos de frenado/bloqueo se quedarían pegados en el HUD del gripper
+            // mientras el operario mueve la cámara.
+            ClearAssistanceState();
+            return;
+        }
+
         if (_controller == null || !_controller.IsValid.Value) return;
 
         float dt = Time.fixedDeltaTime;
@@ -602,8 +767,23 @@ public class JoystickAdapter : MonoBehaviour
             payloadSpeedMultiplier = Mathf.Lerp(1f, _minPayloadSpeedMultiplier, massRatio);
         }
 
+        // Reduce la velocidad cartesiana de forma PROGRESIVA a medida que el gripper se acerca a un
+        // objeto: 1 en el umbral configurado desde el menú de pausa, _proximitySpeedMultiplier al
+        // contacto. Un escalón seco resultaba imperceptible porque la ventana dura ~100 ms.
+        // Se compone con los otros multiplicadores en el mismo punto (antes de la IK, no por joint)
+        // para no romper la relación geométrica entre articulaciones.
+        float proximitySpeedMultiplier = 1f;
+        if (_proximitySensor != null)
+            proximitySpeedMultiplier = Mathf.Lerp(1f, _proximitySpeedMultiplier, _proximitySensor.ProximityFactor);
+
+        ProximitySpeedScale = proximitySpeedMultiplier;
+
         // ── Cálculo de trayectoria ───────────────────────────────────────
-        var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier);
+        var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier * proximitySpeedMultiplier);
+
+        ApplyDescentLimit(ref deltaWorld);
+        ApplyCollisionVeto(ref deltaWorld);
+
         var deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint);
         
         Matrix4x4 currentPose;
@@ -727,8 +907,13 @@ public class JoystickAdapter : MonoBehaviour
             ikTarget = new JointTarget(_prevIkTarget);
         }
 
-        // Registrar telemetría periódica de movimiento cartesiano
-        LogDiagnosticJson("Telemetry_Cartesian", $"Movimiento cartesiano activo. Error orientacion: {physicalRotDrift:F3}deg", physicalRotDrift, driftSpeedMultiplier);
+        // Registrar telemetría periódica de movimiento cartesiano.
+        // speedMult refleja el factor realmente aplicado (drift x payload x proximidad).
+        LogDiagnosticJson(
+            "Telemetry_Cartesian",
+            $"Movimiento cartesiano activo. Error orientacion: {physicalRotDrift:F3}deg. Proximidad: x{proximitySpeedMultiplier:F2}",
+            physicalRotDrift,
+            driftSpeedMultiplier * payloadSpeedMultiplier * proximitySpeedMultiplier);
 
         ApplyPID(ikTarget, dt);
     }
@@ -944,6 +1129,7 @@ public class JoystickAdapter : MonoBehaviour
     private void EndMotion()
     {
         ResetPIDs();
+        ClearAssistanceState();
         _motionActive = false;
     }
 

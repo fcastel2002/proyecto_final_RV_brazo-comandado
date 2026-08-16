@@ -66,6 +66,7 @@ JoystickAdapter.FixedUpdate()
     }
 
     // Avanza trayectoria matemática y resuelve IK
+    // (escalada por driftSpeedMultiplier * payloadSpeedMultiplier * proximitySpeedMultiplier)
     deltaWorld = _velocity * _speed * fixedDeltaTime
     |  deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint)
         |  currentPose = solucion IK anterior o ToolCenterPointFrame
@@ -151,7 +152,7 @@ if (!_motionActive)
 Con input activo, el desplazamiento del joystick se calcula en mundo Unity y luego se convierte al frame activo de Flange. La pose objetivo se arma en ese frame para que la orientacion del TCP quede fija respecto del robot, no respecto del mundo. Adicionalmente, si `_enableWorkspaceLimits` es `true`, la posición del target se proyecta y trunca dentro del espacio dextrógiro seguro definido por los radios horizontales (`_minHorizontalRadius`/`_maxHorizontalRadius`) y límites de altura (`_minHeight`/`_maxHeight`):
 
 ```csharp
-var deltaWorld = _velocity * (_speed * Time.fixedDeltaTime * driftSpeedMultiplier);
+var deltaWorld = _velocity * (_speed * Time.fixedDeltaTime * driftSpeedMultiplier * payloadSpeedMultiplier * proximitySpeedMultiplier);
 var deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint);
 var currentPose = ... // solucion anterior o ToolCenterPointFrame
 Vector3 currentPos = (Vector3)currentPose.GetColumn(3);
@@ -358,10 +359,106 @@ if (_gripperController != null && _gripperController.IsHoldingObject)
     payloadSpeedMultiplier = Mathf.Lerp(1f, _minPayloadSpeedMultiplier, massRatio);
 }
 
-var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier);
+var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier * proximitySpeedMultiplier);
 ```
 
 `_maxSimulatedPayloadMass` (kg) define la masa a partir de la cual la velocidad cae hasta el piso `_minPayloadSpeedMultiplier` (nunca 0, para no bloquear al operador). Se aplica sobre la **trayectoria cartesiana completa antes de la IK**, no sobre cada joint por separado: todos los joints ven la misma trayectoria recta, solo que mas lenta, preservando la relacion geometrica entre velocidades articulares. Clampear velocidades por joint de forma independiente ya demostro romper esa relacion y corromper la orientacion del TCP (ver entrada del 2026-06-29 "Analisis de Limite de Velocidad vs. Trayectoria Cartesiana" en `_REGISTRO_PRUEBAS_CONTROL.md`); por eso el ajuste se hace aca y no en `ApplyPID()`.
+
+### Frenado por proximidad (2026-08-14)
+
+**Archivos:** `Assets/Scripts/JoystickAdapter.cs`, `Assets/Scripts/GripperDistanceSensor.cs`, `Assets/Scripts/ProximitySlowdownSettings.cs`.
+
+Tercer multiplicador de la misma cadena, en el mismo punto y por la misma razon que el de payload.
+Es **progresivo**, no un escalon:
+
+```csharp
+float proximitySpeedMultiplier = 1f;
+if (_proximitySensor != null)
+    proximitySpeedMultiplier = Mathf.Lerp(1f, _proximitySpeedMultiplier, _proximitySensor.ProximityFactor);
+```
+
+`ProximityFactor` vale 0 en el umbral y 1 al contacto, asi que la velocidad cae de forma continua
+hasta `_proximitySpeedMultiplier` (0.5) pegado al objeto.
+
+> [!IMPORTANT]
+> La primera version usaba un escalon seco (1 → 0.5 al cruzar el umbral) con un umbral de 10 cm, y
+> **resultaba imperceptible aunque funcionaba**. Medido en `Logs/control_diagnostics_log.json`: el TCP
+> pasaba de 2.08 m/s a 0.995 m/s, exactamente la mitad. El problema era la duracion: con `_speed` de
+> 1.99 m/s, 10 cm se cruzan en ~100 ms (6 fotogramas), y el clamp de `_maxJointAcceleration` (720 °/s²)
+> ya consume ~42 ms solo en bajar una articulacion de 60 a 30 °/s. Por eso el umbral por defecto paso
+> a 30 cm y la transicion a lineal. **Si vuelve a "no notarse", el sospechoso es la duracion de la
+> ventana, no el mecanismo.**
+
+### Bloqueo de descenso con la garra cerrada
+
+Segundo mecanismo que altera `deltaWorld` antes de la IK, junto al clamp de workspace. Con
+`GripperController.IsGripperClosed`, el paso hacia abajo se recorta al hueco restante:
+
+```csharp
+float allowedDescent = Mathf.Max(0f, _proximitySensor.Distance - ProximitySlowdownSettings.DescentMarginMeters);
+if (deltaWorld.y < -allowedDescent) { deltaWorld.y = -allowedDescent; IsDescentBlocked = true; }
+```
+
+Se aplica en **coordenadas de mundo y antes de `WorldVectorToFrame`**, porque la componente vertical
+del input se compone como `Vector3.up * rawY`, tambien en mundo. Subir nunca se limita.
+
+`DescentMarginMeters` (5 cm por defecto) es un ajuste **propio y distinto** del umbral de frenado, y
+esa separacion es deliberada: atar el bloqueo al umbral de 30 cm impediria depositar una pieza, porque
+el brazo se frenaria en seco a 30 cm del suelo y habria que soltarla desde ahi.
+
+### Anticolision con el entorno (veto de movimiento)
+
+> [!IMPORTANT]
+> **Los colliders NO detienen el brazo por si solos.** El robot se mueve asignando angulos articulares
+> via `MechanicalGroup.SetJoints()`, no con Rigidbody ni fuerzas, y Unity no resuelve la penetracion de
+> objetos movidos por transform: reporta contactos y triggers, pero no frena nada. Ademas, el prefab del
+> KUKA no tiene ni un solo collider ni Rigidbody. La unica forma de detener el brazo respetando la
+> arquitectura es un **veto por software** sobre la trayectoria cartesiana.
+
+`JoystickAdapter.ApplyCollisionVeto()` barre el volumen aproximado del gripper (`SphereCastNonAlloc`,
+radio `_collisionProbeRadius`) a lo largo de `deltaWorld` y recorta el paso al hueco libre menos
+`_collisionClearance`. Tercer mecanismo que altera `deltaWorld`, junto al clamp de workspace y al
+bloqueo de descenso, y por la misma razon: antes de la IK, nunca por joint.
+
+Reglas de diseno:
+
+- **Solapamiento en el origen se ignora** (`hit.distance <= 1e-4`). Si se tratara como obstaculo, un
+  gripper que ya penetro geometria quedaria congelado sin forma de salir.
+- **Las superficies horizontales se ignoran** (`Dot(hit.normal, Vector3.up) > _floorNormalThreshold`).
+  El suelo lo gobierna el bloqueo de descenso, que es preciso y descuenta la pieza transportada. Vetarlo
+  aqui impediria bajar a recoger piezas, porque el radio del barrido frenaria el gripper a ~12 cm del
+  piso.
+- **`_obstacleMask` por defecto es solo la layer `Entorno` (6)**, que hasta ahora estaba definida y sin
+  usar. Mientras no se ejecute `Tools > Entorno > Generar colliders faltantes`, nada esta en esa layer,
+  el veto no actua y el comportamiento es identico al anterior. Es deliberado: la feature se activa
+  cuando el entorno esta preparado, no antes.
+- **Alcance conocido**: solo se vigila el volumen del gripper. Los eslabones altos del brazo (codo,
+  antebrazo) pueden seguir atravesando geometria, porque no tienen colliders y vigilarlos exigiria un
+  barrido por eslabon. Queda fuera de este mecanismo.
+
+Los colliders del entorno se generan con `Assets/Editor/EnvironmentColliderTool.cs`. No se pueden
+obtener activando "Generate Colliders" en el importador de los FBX: la escena instancia los `.prefab`
+derivados del asset, no los FBX, y esos prefabs son assets distintos sin colliders.
+
+Reglas de diseno que hay que respetar si se toca esto:
+
+- **Solo el sensor inferior frena.** En escena conviven 5 `GripperDistanceSensor`: el inferior (`DistanceSensor`, sobre el eje de agarre) y 4 laterales que vienen del prefab `OnRobot_RG2_Holder`. Los laterales tienen `detectionMask` = todas las layers y `maxDistance` 0.4 m, asi que verian el suelo permanentemente y dejarian el brazo clavado al 50%. El sensor que frena se marca con `contributesToSpeedReduction`; `JoystickAdapter.Awake()` busca el primero que lo tenga activo si el campo `_proximitySensor` quedo sin asignar.
+- **El estado vive en el sensor**, no en el adapter. `ProximityFactor` (continuo) alimenta el multiplicador; `IsWithinSlowdownRange` (booleano con histeresis `slowdownReleaseFactor`) alimenta solo el HUD, para que el indicador no parpadee en el borde del umbral. La geometria vive en el sensor y el **piso** del frenado en el adapter, que es quien decide cuanto frenar.
+- **El sensor ve el entorno, no solo las piezas.** `detectionMask` = layer 0 (`Default`) + layer 3 (`Manipulable`). Ampliarla no reintroduce autodeteccion porque `CanDetect()` sigue descartando todo lo que cuelgue de la raiz del robot. Es imprescindible para que la lectura siga siendo util con la garra cerrada y para que el bloqueo de descenso proteja del suelo y no solo de otros cubos. Como contrapartida, `IsGripDistanceSafe` tuvo que acotarse a colliders con tag `Agarrable`: sin eso, "Seguro para agarrar" aparecia al acercarse al piso.
+- **Con una pieza agarrada se mide el hueco bajo la pieza, no bajo el sensor.** El objeto agarrado se vuelve hijo del robot (`GripperController.GrabObject()` hace `SetParent`) y por tanto `CanDetect()` lo descarta; el sensor mide hasta la superficie de mas abajo y le resta cuanto sobresale la pieza (`GetPayloadExtent`). Sin esa resta, el bloqueo de descenso dejaria hundir la pieza en el suelo.
+- **El umbral no vive en ninguno de los dos.** Esta en la clase estatica `ProximitySlowdownSettings` (persistida en `PlayerPrefs`, editable desde el menu de pausa) precisamente para evitar una dependencia circular: el adapter lee la distancia del sensor y el sensor lee el umbral. Con el umbral en `0` el frenado queda desactivado.
+- **No escalar `_velocity` en `Update()`.** Rompería el umbral `_velocity.sqrMagnitude < MotionInputEpsilon` de `FixedUpdate()` (dispararia `EndMotion()` espurio) y no afectaria al modo J6 exclusivo, que relee los ejes crudos.
+
+### Modos de deteccion de `GripperDistanceSensor`
+
+El script soporta dos modos, seleccionables **por instancia** con `detectionMode`:
+
+| Modo | Como mide | Quien lo usa |
+|---|---|---|
+| `Cone` (default) | N `Physics.OverlapSphereNonAlloc` escalonadas que aproximan un cono | Los 4 sensores laterales del prefab |
+| `SphereCast` | `Physics.SphereCastNonAlloc` de radio `castRadius` sobre el eje (o `RaycastNonAlloc` si el radio es 0) | El sensor inferior de escena |
+
+El default es `Cone` a proposito: el YAML del prefab no tiene la clave nueva, asi que los laterales conservan su comportamiento historico sin tocar el prefab. En ambos modos `Distance` es la **distancia euclidea al punto de impacto**, para que la lectura en mm no salte al cambiar de modo.
 
 `ApplyPID()` divide el torque virtual por una inercia normalizada:
 
@@ -401,7 +498,10 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 |---|---|---|
 | `GripperController.cs` | Logica de agarre/suelta | Independiente |
 | `Ctrl_OnRobot_RG2_Custom.cs` | Animacion de dedos del gripper y detección de doble clic para resetear J6 | Llama a `ResetJ6ToZero()` en doble clic |
-| `GripperDistanceSensor.cs` | Sensor de distancia del gripper | Independiente |
+| `GripperDistanceSensor.cs` | Sensor de distancia del gripper (modo `Cone` en los laterales, `SphereCast` en el inferior) | **Entrada de la cadena de control**: el sensor inferior expone `IsWithinSlowdownRange`, que `JoystickAdapter` usa como `proximitySpeedMultiplier` |
+| `ProximitySlowdownSettings.cs` | Umbral de frenado y margen de bloqueo de descenso (estatico, persistido en `PlayerPrefs`, editable desde el menu de pausa) | Parametros de la asistencia por proximidad |
+| `GripperViewSettings.cs` | Largo de las guias perpendiculares de la gripper camera (estatico, `PlayerPrefs`, menu de pausa) | UI General |
+| `GripperStatusOverlay.cs` | Aviso sobre la vista del gripper: "DESCENSO BLOQUEADO" / "VELOCIDAD n%". Se autoinstancia, patron de `J6OverlayController` | Lee `JoystickAdapter.IsDescentBlocked` y `ProximitySpeedScale` |
 | `GripperTopCameraFollow.cs` | Camara superior del gripper | Independiente |
 | `GripperTriggerForwarder.cs` | Reenvio de triggers | Independiente |
 | `JoystickVibrationHidOutput.cs` | Vibracion del joystick | Independiente |
@@ -409,7 +509,7 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 | `JointStatePublisher.cs` | Publicacion de estado articular | Independiente |
 | `RobotTest.cs` | Pruebas/manual | Independiente |
 | `J6OverlayController.cs` | Dibuja un dial superpuesto en Canvas (derecha) cuando el modo J6 exclusivo está activo | UI de J6 Exclusivo |
-| `LeftLayoutManager.cs` | Reposiciona por código `Input Info`/`J1`-`J6`/`SafetyInfoOperator`/`DistanceSensorValue` y delega a `ControlGuidePanel` el cambio de texto PS4/VR2. Ya no crea GameObjects por código. | UI General |
+| `LeftLayoutManager.cs` | Reposiciona por código `Input Info`/`J1`-`J6`/`SafetyInfoOperator` y delega a `ControlGuidePanel` el cambio de texto PS4/VR2. Reparenta `DistanceSensorValue` dentro de `CameraGripperView` (franja inferior, con banda oscura `DistanceValueBackdrop` detrás para legibilidad). | UI General |
 | `PidActionsPanel.cs` | Panel estático (`PID_Section`, hijo de `InfoPanel_Gripper`) con las 6 filas fijas de acción PID por joint; expone `SetJointAction`/`SetExtraRow` para agregar filas nuevas clonando una plantilla inactiva solo si hace falta | UI de Acciones de Control (PID) |
 | `ControlGuidePanel.cs` | Panel estático (`Guide_Section`, hijo de `InfoPanel_Gripper`) con los ítems fijos de la guía de controles PS4/VR2; expone `AddOrUpdateItem` para agregar comandos nuevos clonando una plantilla inactiva solo si hace falta | UI de Guía de Controles |
 

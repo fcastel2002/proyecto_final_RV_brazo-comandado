@@ -1224,6 +1224,9 @@ MonoBehaviour:
   calibrationStatusText: {fileID: 0}
   futureOptionsContainer: {fileID: 0}
   orientationModeButton: {fileID: 0}
+  proximityThresholdButton: {fileID: 0}
+  descentMarginButton: {fileID: 0}
+  guideLengthButton: {fileID: 0}
   joystickAdapter: {fileID: 0}
   overlayColor: {r: 0, g: 0, b: 0, a: 0.55}
   panelColor: {r: 0.08, g: 0.09, b: 0.11, a: 0.96}
@@ -4760,6 +4763,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e8eaf899d121204081412ab7a8caf5d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GripperDistanceSensor
+  detectionMode: 1
+  castRadius: 0.01
   sensorOrigin: {fileID: 1424931421}
   raycastOffset: {x: 0, y: 0, z: 0}
   localDirection: {x: 0, y: 0, z: 1}
@@ -4769,16 +4774,23 @@ MonoBehaviour:
   coneTipRadius: 0.005
   detectionMask:
     serializedVersion: 2
-    m_Bits: 8
+    m_Bits: 73
   triggerInteraction: 2
   safeGripMinDistance: 0.01
   safeGripMaxDistance: 0.05
+  contributesToSpeedReduction: 1
+  slowdownReleaseFactor: 1.15
   distanceText: {fileID: 221625410}
   operatorStatusText: {fileID: 1670670386}
   noHitText: --
   safeGripText: Seguro para agarrar
   unsafeGripText: Ajustar posicion
   noDetectionStatusText: Sin objeto detectado
+  colorizeDistanceText: 1
+  noHitDistanceColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
+  normalDistanceColor: {r: 1, g: 1, b: 1, a: 1}
+  slowdownDistanceColor: {r: 1, g: 0.69, b: 0.13, a: 1}
+  safeGripDistanceColor: {r: 0.3, g: 0.85, b: 0.39, a: 1}
   joystickVibration: {fileID: 1424931423}
   gripperController: {fileID: 0}
   autoFindJoystickVibration: 1
@@ -6081,6 +6093,8 @@ MonoBehaviour:
   _payloadInertiaMultiplier: 5.14
   _maxSimulatedPayloadMass: 20
   _minPayloadSpeedMultiplier: 0.25
+  _proximitySensor: {fileID: 0}
+  _proximitySpeedMultiplier: 0.5
   _logIkPoseError: 1
   _ikPoseLogInterval: 0.25
   _j6MinLimit: -350
