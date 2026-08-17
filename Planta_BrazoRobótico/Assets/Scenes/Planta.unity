@@ -6095,6 +6095,13 @@ MonoBehaviour:
   _minPayloadSpeedMultiplier: 0.25
   _proximitySensor: {fileID: 0}
   _proximitySpeedMultiplier: 0.5
+  _enableCollisionVeto: 1
+  _obstacleMask:
+    serializedVersion: 2
+    m_Bits: 64
+  _collisionProbeRadius: 0.1
+  _collisionClearance: 0.02
+  _floorNormalThreshold: 0.7
   _logIkPoseError: 1
   _ikPoseLogInterval: 0.25
   _j6MinLimit: -350

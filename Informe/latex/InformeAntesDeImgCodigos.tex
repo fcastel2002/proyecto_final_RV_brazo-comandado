@@ -1,11 +1,15 @@
 \documentclass[12pt]{article}
 \usepackage{EngReport}
+\usepackage{tabularx}
+\usepackage{lastpage}
+\usepackage[hidelinks]{hyperref}
+\setlength{\extrarowheight}{2pt}
 \graphicspath{{Imagenes/}}
 \bibliography{Sources}
 \onehalfspacing
 
 % ── Márgenes del documento ─────────────────────────────────────────────────────
-\geometry{a4paper, left=1.91cm, right=1.32cm, top=1.9cm, bottom=2.54cm, includeheadfoot=true}
+\geometry{a4paper, left=1.91cm, right=1.32cm, top=1.9cm, bottom=2.54cm}
 
 % ── Nombres en español ─────────────────────────────────────────────────────────
 \renewcommand{\contentsname}{Índice}
@@ -41,7 +45,7 @@
         % ── Alumnos ─────────────────────────────────────────────────────────
         {\large \textbf{Alumnos}}\\[0.2cm]
         Quiroga, Juan Ignacio -- 13889\\
-        Castel, Francisco -- 13784\\[0.4cm]
+        Castel, Francisco -- 13784\\[0.6cm]
 
         \rule{0.8\textwidth}{0.5mm}\\[0.2cm]
         {\large \textbf{2026}}
@@ -55,13 +59,13 @@
 % ==============================================================================
 \pagestyle{fancy}
 \fancyhf{}
-\setlength{\headheight}{30pt}
+\setlength{\headheight}{24pt}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0.4pt}
-\lhead{\large Facultad de Ingeniería - UNCuyo}
-\rhead{\large Realidad Virtual - 10mo semestre \\ Juan I. Quiroga - Francisco Castel}
-\rfoot{\textbf{Página \thepage}}
-\lfoot{}
+\fancyhead[L]{\small UNCuyo - Ing. Mecatrónica\\Mendoza - Argentina}
+\fancyhead[C]{\small \textbf{Realidad Virtual \\ PROYECTO FINAL}}
+\fancyhead[R]{\small Alumnos: Quiroga, Castel \\ Fecha: 24/08/26}
+\fancyfoot[C]{\small Pág. \thepage{} de \pageref{LastPage}}
 
 % ==============================================================================
 %  ÍNDICE
@@ -176,48 +180,74 @@ La interfaz de usuario en pantalla (\textit{Canvas}) fue implementada utilizando
     \label{fig:unity_hud}
 \end{figure}
 
-Las acciones de entrada se definen en el \textit{Input Action Asset} \texttt{PS4Joystick.inputactions}. La Tabla~\ref{tab:inputactions} resume el mapeo físico completo de las 16 acciones configuradas en el asset. El sistema opera en dos modos exclusivos, conmutados mediante la acción \texttt{ModoCamara} (L3): en \textbf{modo Robot} (\texttt{IsCameraMode = false}), los analógicos mueven el \textit{Tool Center Point} (TCP) del manipulador en el espacio cartesiano; en \textbf{modo Cámara} (\texttt{IsCameraMode = true}), los mismos analógicos controlan la posición y orientación de la cámara principal al estilo \textit{first-person}. Al tratarse de una propiedad estática en \texttt{JoystickAdapter}, el componente \texttt{CameraJoystickController} ---adjunto a la \emph{Main Camera}--- puede consultarla sin requerir una referencia explícita entre objetos.
+Las acciones de entrada se definen en el \textit{Input Action Asset} \texttt{PS4Joystick.inputactions}. Las Tablas~\ref{tab:inputactions_rpi} y~\ref{tab:inputactions_ps4} resumen el mapeo físico completo: la primera corresponde al perfil del joystick HID propio (VR-2) y la segunda al perfil alternativo para gamepad PlayStation~4. El sistema opera en dos modos exclusivos, conmutados mediante la acción \texttt{ModoCamara} (L3): en \textbf{modo Robot} (\texttt{IsCameraMode = false}), los analógicos mueven el \textit{Tool Center Point} (TCP) del manipulador en el espacio cartesiano; en \textbf{modo Cámara} (\texttt{IsCameraMode = true}), los mismos analógicos controlan la posición y orientación de la cámara principal al estilo \textit{first-person}. Al tratarse de una propiedad estática en \texttt{JoystickAdapter}, el componente \texttt{CameraJoystickController} ---adjunto a la \emph{Main Camera}--- puede consultarla sin requerir una referencia explícita entre objetos.
 
 \begin{table}[H]
 \centering
-\caption{Mapeo completo de acciones de entrada (\texttt{PS4Joystick.inputactions}).}
-\label{tab:inputactions}
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{llll}
+\small
+\caption{Mapeo completo del joystick HID propio VR-2 (\texttt{RobotBasic.inputactions}).}
+\label{tab:inputactions_rpi}
+\begin{tabularx}{\linewidth}{|l|l|p{3.2cm}|X|}
 \hline
-\textbf{Acción} & \textbf{Tipo} & \textbf{Control físico} & \textbf{Uso} \\
+\textbf{Acción} & \textbf{Tipo} & \textbf{Control VR-2 / HID} & \textbf{Uso en la aplicación} \\
 \hline
-\multicolumn{4}{l}{\textit{Modo Robot -- movimiento del TCP}} \\
+\texttt{Mover X}            & Value  & Palanca principal, eje \texttt{stick/y}  & Traslación lateral del TCP; en modo Cámara, avance/retroceso. \\
 \hline
-\texttt{MoveX}       & 1D Axis & L-Stick Left/Right   & Traslación lateral del TCP \\
-\texttt{MoveY}       & 1D Axis & R-Stick Up/Down      & Traslación vertical del TCP \\
-\texttt{MoveZ}       & 1D Axis & L-Stick Up/Down      & Traslación frontal del TCP \\
+\texttt{Mover Y}            & Value  & Palanca de altura, eje \texttt{z}        & Traslación vertical del TCP. \\
 \hline
-\multicolumn{4}{l}{\textit{Modo Robot -- control de articulación J6 y garra}} \\
+\texttt{Mover Z}            & Value  & Palanca principal, eje \texttt{stick/x}  & Traslación frontal del TCP; en modo Cámara, desplazamiento lateral. Junto con \texttt{Mover X} forma el gesto circular para J6. \\
 \hline
-\texttt{J6AntiHor}   & Button  & L1 (leftShoulder)    & Rotación de J6 antihorario \\
-\texttt{J6Hor}       & Button  & R1 (rightShoulder)   & Rotación de J6 horario \\
-\texttt{J6Home}      & Button  & Cuadrado (buttonWest) & Homing de J6 a posición cero \\
-\texttt{Gripper}     & Button  & R3 (rightStickPress) & Toggle apertura/cierre de garra \\
+\texttt{Gripper}            & Button & Trigger izquierdo (\texttt{trigger})     & Pulsación corta: alterna apertura/cierre al soltar. Mantener 1\,s: referencia J6 sin accionar la garra. \\
 \hline
-\multicolumn{4}{l}{\textit{Modo Cámara -- navegación de la cámara principal}} \\
+\texttt{Camera Toggle}      & Button & Pulsador derecho (\texttt{button2})      & Clic corto: Robot/Cámara; doble clic: modo J6; mantener 2\,s: abre o cierra el menú de pausa. \\
 \hline
-\texttt{MoveForward} & 1D Axis & L-Stick Up/Down      & Avance/retroceso de la cámara \\
-\texttt{MoveSide}    & 1D Axis & L-Stick Left/Right   & Desplazamiento lateral de la cámara \\
-\texttt{ViewUp}      & 1D Axis & R-Stick Up/Down      & Rotación vertical (pitch) \\
-\texttt{ViewSide}    & 1D Axis & R-Stick Left/Right   & Rotación horizontal (yaw) \\
+\texttt{Click}              & Button & Pulsador derecho (\texttt{button2})      & Confirma la opción seleccionada cuando el menú está abierto. \\
 \hline
-\multicolumn{4}{l}{\textit{Acciones globales}} \\
+\texttt{SelectorUP/DOWN}    & Value  & Palanca de altura (\texttt{z})           & Navegación vertical del menú. \\
 \hline
-\texttt{ModoCamara}  & Button  & L3 (leftStickPress)  & Toggle modo Robot / Cámara \\
-\texttt{Click}       & Button  & X/Cruz (buttonSouth) & Confirmación / selección \\
-\texttt{Pause}       & Button  & Options (start)      & Pausar simulación \\
-\texttt{SelectorUP / DOWN} & Button & D-pad Up/Down  & Navegación de perfil de control \\
-\texttt{SelectorLEFT / RIGHT} & Button & D-pad Left/Right & Cambio de escena/modo \\
+\texttt{SelectorLEFT/RIGHT} & Value  & Palanca principal (\texttt{stick/y})     & Navegación horizontal del menú. \\
 \hline
-\end{tabular}%
-}
+\texttt{Pausa}              & Button & Trigger izquierdo (\texttt{trigger})     & Acción reservada en el asset; la pausa efectiva del perfil VR-2 se ejecuta manteniendo \texttt{Camera Toggle}. \\
+\hline
+\end{tabularx}
 \end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Mapeo completo del perfil alternativo PlayStation 4 (\texttt{PS4Joystick.inputactions}).}
+\label{tab:inputactions_ps4}
+\begin{tabularx}{\linewidth}{|l|l|p{3cm}|X|}
+\hline
+\textbf{Acción} & \textbf{Tipo} & \textbf{Control PS4} & \textbf{Uso en la aplicación} \\
+\hline
+\texttt{MoveX} / \texttt{MoveZ}                & 1D Axis & Stick izquierdo              & Traslación lateral/frontal del TCP; también forma el gesto circular de J6. \\
+\hline
+\texttt{MoveY}                                 & 1D Axis & Stick derecho, eje vertical  & Traslación vertical del TCP. \\
+\hline
+\texttt{MoveForward} / \texttt{MoveSide}       & 1D Axis & Stick izquierdo              & Avance/retroceso y desplazamiento lateral de la cámara. \\
+\hline
+\texttt{ViewUp} / \texttt{ViewSide}            & 1D Axis & Stick derecho                & Rotación vertical (\textit{pitch}) y horizontal (\textit{yaw}) de la cámara. \\
+\hline
+\texttt{ModoCamara}                            & Button  & L3                           & Clic corto: Robot/Cámara; doble clic: modo J6; mantener 2\,s: pausa/menú. \\
+\hline
+\texttt{Gripper}                               & Button  & R3                           & Pulsación corta: apertura/cierre; mantener 1\,s: referencia J6. \\
+\hline
+\texttt{J6AntiHor} / \texttt{J6Hor}           & Button  & L1 / R1                      & En modo J6, giro antihorario/horario a velocidad constante. \\
+\hline
+\texttt{J6Home}                                & Button  & Cuadrado                     & Retorno directo de J6 a su referencia física. \\
+\hline
+\texttt{Click}                                 & Button  & Cruz                         & Confirmación de la opción seleccionada. \\
+\hline
+\texttt{Pause}                                 & Button  & Options                      & Abre o cierra el menú de pausa. \\
+\hline
+\texttt{SelectorUP} / \texttt{SelectorDOWN}   & Button  & Cruceta arriba/abajo         & Navegación vertical del menú. \\
+\hline
+\texttt{SelectorLEFT} / \texttt{SelectorRIGHT}& Button  & Cruceta izquierda/derecha    & Navegación horizontal del menú. \\
+\hline
+\end{tabularx}
+\end{table}
+
 
 En modo Robot, el componente \texttt{JoystickAdapter} construye en cada \texttt{FixedUpdate} el incremento de posición del TCP en espacio mundo:
 
@@ -257,7 +287,7 @@ también con signo positivo fijo. De este modo, empujar el analógico izquierdo 
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.65\textwidth]{figura_remapeo}
+    \includegraphics[width=0.85\textwidth]{figura_remapeo}
     \caption{Plano horizontal $XZ$ del mundo ilustrando el remapeo: el vector $\hat{\mathbf{d}}_Z$ apunta de la cámara (MC) al TCP del manipulador (KUKA), y $\hat{\mathbf{d}}_X$ se obtiene como su perpendicular en el plano horizontal.}
     \label{fig:desarrollo}
 \end{figure}

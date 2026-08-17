@@ -196,6 +196,18 @@ public class JointStateBroadcaster : MonoBehaviour
         BeginListening(client);
     }
 
+    /// <summary>Copia segura de los endpoints actualmente suscriptos, para consumo desde otros MonoBehaviours (ej. panel de UI).</summary>
+    public List<IPEndPoint> GetActiveSubscribers()
+    {
+        lock (_subscribersLock)
+        {
+            var result = new List<IPEndPoint>(_subscribers.Count);
+            foreach (var endPoint in _subscribers.Keys)
+                result.Add(new IPEndPoint(endPoint.Address, endPoint.Port));
+            return result;
+        }
+    }
+
     private void CloseSocket()
     {
         _isClosing = true;
