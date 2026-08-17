@@ -319,8 +319,10 @@ Acepta dos parametros opcionales, `payloadMass` y `payloadWorldPos`. Si `payload
 
 Expone de solo lectura:
 
-- `GrabbedMass`: masa original (kg) del objeto actualmente agarrado, o `0` si no hay ninguno.
+- `GrabbedMass`: masa original (kg) del objeto actualmente agarrado, o `0` si no hay ninguno (tambien `0` si la pieza no tiene `Rigidbody`).
 - `GrabbedWorldPosition`: posicion mundial del `graspPoint`, rigidamente ligado al objeto agarrado mientras esta tomado.
+
+Ver tambien "Ciclo de agarre y suelta" mas abajo: durante una suelta pendiente `IsHoldingObject` sigue en `true`, de modo que la carga se descuenta de la inercia recien cuando la pieza vuelve a la fisica (~0.07 s despues de pulsar el boton, con los valores por defecto).
 
 **Archivo:** `Assets/Scripts/JoystickAdapter.cs`
 
@@ -395,16 +397,51 @@ Segundo mecanismo que altera `deltaWorld` antes de la IK, junto al clamp de work
 `GripperController.IsGripperClosed`, el paso hacia abajo se recorta al hueco restante:
 
 ```csharp
-float allowedDescent = Mathf.Max(0f, _proximitySensor.Distance - ProximitySlowdownSettings.DescentMarginMeters);
+bool isCarryingPayload = _gripperController.IsHoldingObject;
+float allowedDescent = Mathf.Max(0f, _proximitySensor.Distance - ProximitySlowdownSettings.GetDescentMargin(isCarryingPayload));
 if (deltaWorld.y < -allowedDescent) { deltaWorld.y = -allowedDescent; IsDescentBlocked = true; }
 ```
 
 Se aplica en **coordenadas de mundo y antes de `WorldVectorToFrame`**, porque la componente vertical
 del input se compone como `Vector3.up * rawY`, tambien en mundo. Subir nunca se limita.
 
-`DescentMarginMeters` (5 cm por defecto) es un ajuste **propio y distinto** del umbral de frenado, y
-esa separacion es deliberada: atar el bloqueo al umbral de 30 cm impediria depositar una pieza, porque
-el brazo se frenaria en seco a 30 cm del suelo y habria que soltarla desde ahi.
+**Hay dos margenes, y la separacion es el punto entero del mecanismo (2026-08-16).** Cada uno resuelve
+una maniobra opuesta:
+
+| Situacion | Ajuste | Default | Para que |
+|---|---|---|---|
+| Garra cerrada **vacia** | `DescentMarginMeters` | 5 cm | Que el gripper no se estrelle contra el suelo al bajar a recoger. |
+| Garra **con pieza** | `CarryDescentMarginMeters` | 5 mm | Poder **apoyar** la pieza. El sensor ya descuenta cuanto sobresale (`GetPayloadExtent`), asi que el hueco medido es el que queda bajo la pieza y tiene que poder llegar casi a cero. |
+
+Es la misma logica que ya separaba `DescentMarginMeters` del umbral de frenado, un nivel mas abajo:
+atar el bloqueo al umbral de 30 cm impediria acercarse a la pieza, y atar el margen con pieza al de la
+garra vacia impide depositarla, porque el brazo se frena con la pieza a 5 cm de la superficie y hay que
+soltarla desde ahi. `GetDescentMargin(bool)` e `IsDescentBlockEnabledFor(bool)` son el unico punto donde
+se elige, para que el bloqueo y su HUD no puedan discrepar. Cualquiera de los dos en `0` desactiva el
+bloqueo en esa situacion.
+
+### Piso duro (limite geometrico, 2026-08-16)
+
+`JoystickAdapter.ApplyHardFloorLimit()` impide que el gripper —o la pieza que lleve— baje por debajo de
+`_hardFloorWorldY` (+ `_hardFloorClearance`). Cuarto mecanismo que altera `deltaWorld` antes de la IK.
+
+**Por que hace falta si ya existen el bloqueo de descenso y el veto de colision:** esos dos son
+**reactivos**. El bloqueo necesita `_proximitySensor.HasHit` y el veto necesita golpear un collider. Los
+prefabs del entorno vienen con `addColliders: 0`, asi que mientras no se ejecute
+`Tools > Entorno > Generar colliders faltantes` **el suelo no existe para las queries de fisica**: no hay
+hit, no hay impacto, ninguno de los dos actua y el brazo lo atraviesa. El clamp de workspace tampoco lo
+evita, porque su `_minHeight` (-0.2 por defecto) esta en el **frame del robot**, no en mundo.
+
+Este limite es puramente geometrico y no depende del entorno. Se mide sobre los AABB reales de
+`GripperController.TryGetGripperBounds()` y `TryGetPayloadBounds()`, de modo que no hay offsets que
+calibrar; si no hubiera ningun collider donde medir, cae al TCP como referencia (conservador: la punta de
+los dedos queda por debajo). Se ejecuta **despues** de `ApplyDescentLimit()`, que resetea
+`IsDescentBlocked` al entrar, para que el aviso del HUD sobreviva cuando quien frena es el piso.
+
+> [!NOTE]
+> `_hardFloorWorldY` debe coincidir con `GrabbableSafetyGuard.minimumWorldY` y
+> `GripperController.minimumReleaseWorldY`. Los tres describen la misma cota del suelo y hoy viven por
+> separado; si se cambia el nivel del suelo hay que tocar los tres.
 
 ### Anticolision con el entorno (veto de movimiento)
 
@@ -420,10 +457,20 @@ radio `_collisionProbeRadius`) a lo largo de `deltaWorld` y recorta el paso al h
 `_collisionClearance`. Tercer mecanismo que altera `deltaWorld`, junto al clamp de workspace y al
 bloqueo de descenso, y por la misma razon: antes de la IK, nunca por joint.
 
+**Segundo barrido para la pieza agarrada (2026-08-16).** Al agarrarla, la pieza pasa a colgar del robot
+y `IsObstacle()` la descarta, de modo que el barrido de arriba solo representa el volumen del gripper:
+lateralmente se la podia empotrar contra el entorno. Si `_includePayloadInCollisionVeto` esta activo y
+`GripperController.TryGetPayloadBounds()` devuelve un AABB, se lanza un `BoxCastNonAlloc` con ese volumen
+en la misma direccion y se toma **el mas restrictivo de los dos**. Se usa el AABB real y no un radio de
+esfera mayor a proposito: inflar `_collisionProbeRadius` penalizaria tambien al gripper vacio. El filtrado
+de impactos es compartido (`NearestObstacleDistance`), asi que ambos barridos aplican exactamente los
+mismos descartes.
+
 Reglas de diseno:
 
 - **Solapamiento en el origen se ignora** (`hit.distance <= 1e-4`). Si se tratara como obstaculo, un
-  gripper que ya penetro geometria quedaria congelado sin forma de salir.
+  gripper que ya penetro geometria quedaria congelado sin forma de salir. Vale igual para el barrido de
+  la pieza: una pieza apoyada sobre una mesa arranca solapando y no debe bloquear el movimiento.
 - **Las superficies horizontales se ignoran** (`Dot(hit.normal, Vector3.up) > _floorNormalThreshold`).
   El suelo lo gobierna el bloqueo de descenso, que es preciso y descuenta la pieza transportada. Vetarlo
   aqui impediria bajar a recoger piezas, porque el radio del barrido frenaria el gripper a ~12 cm del
@@ -432,13 +479,23 @@ Reglas de diseno:
   usar. Mientras no se ejecute `Tools > Entorno > Generar colliders faltantes`, nada esta en esa layer,
   el veto no actua y el comportamiento es identico al anterior. Es deliberado: la feature se activa
   cuando el entorno esta preparado, no antes.
-- **Alcance conocido**: solo se vigila el volumen del gripper. Los eslabones altos del brazo (codo,
-  antebrazo) pueden seguir atravesando geometria, porque no tienen colliders y vigilarlos exigiria un
-  barrido por eslabon. Queda fuera de este mecanismo.
+- **Alcance conocido**: se vigilan el volumen del gripper y el de la pieza agarrada. Los eslabones altos
+  del brazo (codo, antebrazo) pueden seguir atravesando geometria, porque no tienen colliders y vigilarlos
+  exigiria un barrido por eslabon. Queda fuera de este mecanismo.
 
 Los colliders del entorno se generan con `Assets/Editor/EnvironmentColliderTool.cs`. No se pueden
 obtener activando "Generate Colliders" en el importador de los FBX: la escena instancia los `.prefab`
 derivados del asset, no los FBX, y esos prefabs son assets distintos sin colliders.
+
+> [!IMPORTANT]
+> La herramienta opera sobre las **escenas cargadas**, y el entorno vive en `Map_v2`, no en `Planta`.
+> Ejecutarla con `Map_v2` sin cargar no da error: informa de los pocos objetos que encontro y deja el
+> entorno intacto. Ademas solo marca las escenas como dirty, **no las guarda**: sin un `Ctrl+S` sobre
+> `Map_v2` los colliders existen en la sesion actual del Editor y se pierden al cerrar.
+>
+> `Tools > Entorno > Diagnosticar anticolision` imprime el estado real —escenas cargadas, mallas con
+> collider y en layer `Entorno` por escena, y si las mascaras del veto y del sensor cubren esa layer—
+> para no tener que deducirlo.
 
 Reglas de diseno que hay que respetar si se toca esto:
 
@@ -479,6 +536,30 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 
 ---
 
+### Ciclo de agarre y suelta (2026-08-16)
+
+**Archivos:** `Assets/Scripts/GripperController.cs`, `Assets/Scripts/Ctrl_OnRobot_RG2_Custom.cs`.
+
+El agarre se confirma solo si, **durante una orden explicita de cierre** (`isClosing`), la misma pieza toca las caras internas de **ambos** dedos (`HasOpposingInnerContacts`). Tocar un objeto con la garra ya cerrada nunca lo adhiere. Al confirmar, la pieza pasa a cinematica y se emparenta al `graspPoint`.
+
+Si **varias** piezas cumplen el criterio a la vez, se agarra la mas cercana al `graspPoint`. Antes se tomaba la primera del diccionario, y el orden de iteracion de un `Dictionary` no esta definido: con dos piezas entre los dedos, cual se llevaba era arbitrario y no reproducible.
+
+`SetParent` preserva la pose mundial pero **no** la escala, asi que si el `graspPoint` arrastra una escala distinta de 1 la pieza se deforma al agarrarla. `PreserveWorldScale()` corrige la escala local para mantener la mundial, avisa por consola (bajo modo debug) de que la jerarquia deberia revisarse, y al soltar se restaura la `localScale` exacta que la pieza tenia antes.
+
+**La suelta es diferida, no inmediata.** `ToggleGrip()` a abierto solo marca `isReleasing`; la devolucion real a la fisica ocurre en `FixedUpdate()` (`UpdatePendingRelease`). Motivo: si la pieza vuelve a ser dinamica con los dedos todavia cerrados encima, Unity resuelve esa penetracion y la pieza salta o sale disparada de costado.
+
+La condicion (`HaveFingersClearedPayload`) es un **incremento** de apertura, `releaseOpeningDelta` (0-1, default `0.2`), medido desde la apertura que los dedos tenian al ordenar la suelta — **no** un umbral absoluto. Al agarrar, `StopMotion()` deja los dedos detenidos apoyados sobre la pieza, asi que una pieza ancha arranca la suelta con `OpeningFraction` ya alta y un umbral absoluto se cumpliria en el primer tick, que es justo lo que hay que evitar. Como caso limite (pieza casi tan ancha como la carrera del RG2, donde ese incremento no cabe) tambien basta con `IsInPosition` y apertura mayor que la inicial. Un `releaseTimeout` (default `1 s`) fuerza la suelta con warning si la animacion no avanza, para que la pieza nunca quede pegada. Si se vuelve a cerrar antes de que se cumpla la condicion, la suelta pendiente se cancela y el agarre se mantiene.
+
+Mientras dura la suelta pendiente, `IsHoldingObject` sigue en `true`: la inercia y la penalizacion de velocidad por payload se mantienen hasta que la pieza realmente se libera. `IsGripperClosed`, en cambio, pasa a `false` de inmediato (refleja la intencion del operario y libera el bloqueo de descenso).
+
+**Velocidad al soltar.** Por defecto la pieza se libera con velocidad cero: cae en vertical, que es lo mas predecible para formacion. Con `inheritReleaseVelocity` activo hereda la velocidad del `graspPoint` (estimada por diferencia de posicion entre ticks de fisica en `TrackGraspVelocity()`), acotada por `maxInheritedReleaseSpeed`.
+
+**Masa del gripper.** `RefreshGripperMass()` reasigna `gripperRigidbody.mass = gripperBaseMass + GrabbedMass` (con `gripperBaseMass` cacheado en `Awake()`), en vez de acumular `mass +=` / `mass -=`, que derivaba si un agarre y su suelta no se emparejaban. `originalMass` y el `isKinematic` previo de la pieza se guardan al agarrar y se restauran tal cual al soltar; si la pieza no tiene `Rigidbody`, `originalMass` se pone a `0` explicitamente (antes conservaba la masa de la pieza anterior y falseaba `jEff` y `payloadSpeedMultiplier`).
+
+**Interfaz publica de `Ctrl_OnRobotRG2_Custom`** usada por `GripperController`: `OpeningFraction` (0 = cerrado, 1 = abierto, normalizada contra el angulo de `s_max` del polinomio del RG2), `IsInPosition` y `StopMotion()`. `in_position` es `public` solo bajo `#if UNITY_EDITOR`, asi que escribirlo directamente rompia la compilacion de cualquier build standalone; `StopMotion()` existe para encapsularlo.
+
+---
+
 ## 6. Resets de estado
 
 | Evento | Accion actual |
@@ -499,8 +580,9 @@ qNew[i] = qActual + _jointVelocity[i] * dt;
 | `GripperController.cs` | Logica de agarre/suelta | Independiente |
 | `Ctrl_OnRobot_RG2_Custom.cs` | Animacion de dedos del gripper y detección de doble clic para resetear J6 | Llama a `ResetJ6ToZero()` en doble clic |
 | `GripperDistanceSensor.cs` | Sensor de distancia del gripper (modo `Cone` en los laterales, `SphereCast` en el inferior) | **Entrada de la cadena de control**: el sensor inferior expone `IsWithinSlowdownRange`, que `JoystickAdapter` usa como `proximitySpeedMultiplier` |
-| `ProximitySlowdownSettings.cs` | Umbral de frenado y margen de bloqueo de descenso (estatico, persistido en `PlayerPrefs`, editable desde el menu de pausa) | Parametros de la asistencia por proximidad |
+| `ProximitySlowdownSettings.cs` | Umbral de frenado y los **dos** margenes de bloqueo de descenso, garra vacia y con pieza (estatico, persistido en `PlayerPrefs`, editables desde el menu de pausa) | Parametros de la asistencia por proximidad |
 | `GripperViewSettings.cs` | Largo de las guias perpendiculares de la gripper camera (estatico, `PlayerPrefs`, menu de pausa) | UI General |
+| `DebugSettings.cs` | Modo debug global: enciende/apaga en caliente los logs de diagnostico (estatico, `PlayerPrefs`, menu de pausa). Lo consultan `GripperController`, `GripperTriggerForwarder` y `GrabbableSafetyGuard`; sus flags `[SerializeField]` locales siguen actuando como override por componente | Independiente de la cadena de control |
 | `GripperStatusOverlay.cs` | Aviso sobre la vista del gripper: "DESCENSO BLOQUEADO" / "VELOCIDAD n%". Se autoinstancia, patron de `J6OverlayController` | Lee `JoystickAdapter.IsDescentBlocked` y `ProximitySpeedScale` |
 | `GripperTopCameraFollow.cs` | Camara superior del gripper | Independiente |
 | `GripperTriggerForwarder.cs` | Reenvio de triggers | Independiente |

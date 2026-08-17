@@ -25,8 +25,12 @@ public class GripperTriggerForwarder : MonoBehaviour
 	private GripperFingerSide fingerSide = GripperFingerSide.Auto;
 
 	[Header("Debug")]
+	[Tooltip("Fuerza los logs de este dedo aunque el modo debug global del menú de pausa esté apagado.")]
 	[SerializeField]
-	private bool debug = true;
+	private bool debug;
+
+	/// <summary>Logs activos por el flag local del Inspector o por el modo debug del menú de pausa.</summary>
+	private bool LogEnabled => debug || DebugSettings.IsEnabled;
 
 	private readonly Dictionary<GameObject, HashSet<Collider>> activeContacts =
 		new Dictionary<GameObject, HashSet<Collider>>();
@@ -38,7 +42,7 @@ public class GripperTriggerForwarder : MonoBehaviour
 		if (gripperController == null)
 		{
 			gripperController = GetComponentInParent<GripperController>();
-			if (debug) Debug.Log($"[GripperTriggerForwarder] Auto-found GripperController: {(gripperController ? gripperController.name : "null")}");
+			if (LogEnabled) Debug.Log($"[GripperTriggerForwarder] Auto-found GripperController: {(gripperController ? gripperController.name : "null")}");
 		}
 	}
 
@@ -55,7 +59,7 @@ public class GripperTriggerForwarder : MonoBehaviour
 		if (colliders.Add(other) && colliders.Count == 1)
 		{
 			gripperController?.NotifyFingerContact(grabbable, this, true);
-			if (debug) Debug.Log($"[GripperTriggerForwarder] Contacto interno ({gameObject.name}) con {grabbable.name}");
+			if (LogEnabled) Debug.Log($"[GripperTriggerForwarder] Contacto interno ({gameObject.name}) con {grabbable.name}");
 		}
 	}
 
@@ -69,7 +73,7 @@ public class GripperTriggerForwarder : MonoBehaviour
 		{
 			activeContacts.Remove(grabbable);
 			gripperController?.NotifyFingerContact(grabbable, this, false);
-			if (debug) Debug.Log($"[GripperTriggerForwarder] Fin de contacto interno ({gameObject.name}) con {grabbable.name}");
+			if (LogEnabled) Debug.Log($"[GripperTriggerForwarder] Fin de contacto interno ({gameObject.name}) con {grabbable.name}");
 		}
 	}
 

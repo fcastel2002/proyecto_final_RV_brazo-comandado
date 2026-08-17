@@ -1,7 +1,9 @@
 using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 
 public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 {
@@ -25,6 +27,8 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 	private float __stroke;
 	private float __theta;
 	private float __theta_i;
+	//      Angulo (deg) correspondiente a la apertura maxima. Se evalua una sola vez, bajo demanda.
+	private float __theta_max;
 
 	//  Parts (left, right hand) to be transformed.
 	private GameObject R_Arm_ID_0; private GameObject R_Arm_ID_1;
@@ -71,6 +75,34 @@ public class Ctrl_OnRobotRG2_Custom : MonoBehaviour
 #else
         private bool in_position;
 #endif
+
+	/// <summary>
+	/// Apertura actual de los dedos normalizada: 0 = totalmente cerrado, 1 = totalmente abierto.
+	/// La consume GripperController para no devolver la pieza a la fisica con los dedos encima.
+	/// </summary>
+	public float OpeningFraction
+	{
+		get
+		{
+			if (__theta_max <= 0.0f) __theta_max = Polyval(coefficients, s_max) * Mathf.Rad2Deg;
+			return __theta_max > 0.0f ? Mathf.Clamp01(__theta_i / __theta_max) : 0.0f;
+		}
+	}
+
+	/// <summary>True cuando la animacion de los dedos alcanzo la apertura ordenada.</summary>
+	public bool IsInPosition => in_position;
+
+	/// <summary>
+	/// Detiene la animacion de los dedos donde esten ahora. Lo usa GripperController al confirmar un
+	/// agarre, para que los dedos queden apoyados sobre la pieza en vez de seguir cerrando.
+	/// Existe como metodo publico porque in_position es privado fuera del Editor.
+	/// </summary>
+	public void StopMotion()
+	{
+		start_movement = false;
+		ctrl_state = 0;
+		in_position = true;
+	}
 
 	private void OnEnable()
 	{

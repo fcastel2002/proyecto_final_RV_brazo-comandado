@@ -1,4 +1,0 @@
-repository "Planta_BrazoRobótico/Planta_BrazoRobótico@4673806271339@cloud"
-  path "/"
-    br "/main"
-    co "/main"

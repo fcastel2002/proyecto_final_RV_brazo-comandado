@@ -2735,7 +2735,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0bd98b08aecd8cd4eb56aa3f32e5dba9, type: 2}
+  - {fileID: 2100000, guid: 6b0c7f42d81a4e35b9f2a6d0c37e8514, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -2766,7 +2766,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 791994877}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: fcddc27f27da19145b8037c066f61b84, type: 2}
 --- !u!4 &791994882
 Transform:
   m_ObjectHideFlags: 0
@@ -3384,7 +3384,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0bd98b08aecd8cd4eb56aa3f32e5dba9, type: 2}
+  - {fileID: 2100000, guid: 6b0c7f42d81a4e35b9f2a6d0c37e8514, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3415,7 +3415,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 883498306}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: fcddc27f27da19145b8037c066f61b84, type: 2}
 --- !u!4 &883498311
 Transform:
   m_ObjectHideFlags: 0
@@ -4227,7 +4227,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 0bd98b08aecd8cd4eb56aa3f32e5dba9, type: 2}
+  - {fileID: 2100000, guid: 6b0c7f42d81a4e35b9f2a6d0c37e8514, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -4258,7 +4258,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1309936820}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: fcddc27f27da19145b8037c066f61b84, type: 2}
 --- !u!4 &1309936825
 Transform:
   m_ObjectHideFlags: 0
@@ -6000,6 +6000,10 @@ MonoBehaviour:
   minimumReleaseWorldY: 0
   preservePickupFloorHeight: 1
   releaseClearance: 0.005
+  releaseOpeningDelta: 0.2
+  releaseTimeout: 1
+  inheritReleaseVelocity: 0
+  maxInheritedReleaseSpeed: 1.5
   debugTriggers: 1
 --- !u!114 &1721627819
 MonoBehaviour:
@@ -6102,6 +6106,10 @@ MonoBehaviour:
   _collisionProbeRadius: 0.1
   _collisionClearance: 0.02
   _floorNormalThreshold: 0.7
+  _includePayloadInCollisionVeto: 1
+  _enableHardFloor: 1
+  _hardFloorWorldY: 0
+  _hardFloorClearance: 0.005
   _logIkPoseError: 1
   _ikPoseLogInterval: 0.25
   _j6MinLimit: -350

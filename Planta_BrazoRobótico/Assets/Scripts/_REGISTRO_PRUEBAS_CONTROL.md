@@ -815,3 +815,310 @@ Decision:
 - Alcance conocido y aceptado: **solo se vigila el volumen del gripper**. Los eslabones altos (codo, antebrazo) pueden seguir atravesando geometria; cubrirlos exigiria colliders por eslabon y un barrido por cada uno.
 
 **Incidencia de trabajo a tener presente:** el Editor del usuario tenia `Planta.unity` cargada con cambios sin guardar mientras se editaba el mismo archivo en disco. Al guardar, Unity sobrescribio la edicion de `detectionMask` (volvio de 9 a 8) conservando el resto. Antes de editar la escena por fuera del Editor, hay que asegurarse de que no este cargada y sucia, o reaplicar y verificar despues.
+
+---
+
+### 2026-08-16 - Robustez del agarre: suelta diferida, estado del payload y compilacion de build
+
+Origen:
+- Pedido del usuario: revisar que se podria mejorar del agarre sin cambios profundos, y aplicar el primer bloque (bugs de pocas lineas). No se toco nada fuera de la cadena de agarre.
+
+Sintomas / hallazgos (revision de codigo, no reportados en Play Mode):
+1. **La pieza se soltaba antes de que los dedos abrieran.** `ToggleGrip()` llamaba a `ReleaseObject()` en el mismo frame en que el animator recien arrancaba la apertura, asi que la pieza volvia a ser dinamica con los dedos todavia cerrados encima: Unity resuelve esa penetracion y la pieza salta, vibra o sale disparada de costado.
+2. **`originalMass` se arrastraba entre agarres.** Si la pieza agarrada no tenia `Rigidbody`, nunca se asignaba, pero `GrabbedMass` la devolvia igual (solo comprobaba `grabbedObject != null`): la inercia efectiva y el `payloadSpeedMultiplier` usaban la masa de la pieza *anterior*.
+3. **Deriva de masa del gripper.** El par `gripperRigidbody.mass += / -=` acumula error permanente si algun agarre y su suelta no se emparejan (p.ej. si la pieza se destruye mientras esta tomada).
+4. **No se guardaba el `isKinematic` previo de la pieza:** una pieza que ya fuera cinematica quedaba dinamica al soltarla.
+5. **La build standalone no compilaba, por dos motivos independientes en el mismo par de archivos:** `using UnityEditor;` sin guarda en `Ctrl_OnRobot_RG2_Custom.cs`, y `GripperController` escribiendo `gripperAnimator.in_position`, que fuera del Editor es `private`. En el Editor esto no se nota nunca.
+6. **Logs de trigger activos por defecto** (`debugTriggers`, `debug`): escriben en consola en cada entrada/salida de contacto.
+
+Cambio probado:
+- `Ctrl_OnRobot_RG2_Custom.cs`: `using UnityEditor;` envuelto en `#if UNITY_EDITOR`. Nueva interfaz publica de solo lectura `OpeningFraction` (apertura normalizada contra el angulo de `s_max`, evaluado una sola vez y cacheado en `__theta_max`) e `IsInPosition`, mas `StopMotion()` para encapsular la parada de la animacion sin tocar `in_position` desde fuera.
+- `GripperController.cs`: suelta diferida (`BeginRelease` / `UpdatePendingRelease`, llamada desde `FixedUpdate`) con `releaseOpeningDelta` (default `0.2`) y `releaseTimeout` (default `1 s`, fuerza la suelta con warning si la animacion no avanza). Volver a cerrar durante la espera cancela la suelta y mantiene el agarre.
+  - **Correccion durante la propia implementacion, vale la pena registrarla:** el umbral se planteo primero como apertura absoluta (`releaseOpeningFraction >= 0.35`). Estaba mal: al agarrar, `StopMotion()` deja los dedos detenidos apoyados sobre la pieza, asi que una pieza ancha arranca la suelta con `OpeningFraction` ya por encima del umbral y liberaba en el primer tick — el bug original habria seguido vivo justo en las piezas grandes, que son las que peor saltan. La condicion final (`HaveFingersClearedPayload`) mide el **incremento** de apertura desde el instante de la orden, con `IsInPosition` como caso limite para piezas casi tan anchas como la carrera del RG2. `RefreshGripperMass()` reasigna `base + payload` en vez de acumular. Se guardan y restauran `originalMass` y `grabbedWasKinematic`; `originalMass = 0` explicito cuando no hay `Rigidbody`. El reset de estado y la masa se aplican fuera del `if (grabbedObject != null)` para cubrir la pieza destruida. `debugTriggers` por defecto a `false`.
+- `GripperTriggerForwarder.cs`: `debug` por defecto a `false`.
+
+Archivos tocados:
+- `Assets/Scripts/GripperController.cs`
+- `Assets/Scripts/Ctrl_OnRobot_RG2_Custom.cs`
+- `Assets/Scripts/GripperTriggerForwarder.cs`
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: nueva subseccion "Ciclo de agarre y suelta" y nota en la seccion 5.
+
+Resultado observado:
+- Compilacion **ejecutada**, dos veces, con `dotnet build` sobre el `Assembly-CSharp.csproj` que genera Unity (el batchmode no podia arrancar: el Editor del usuario tenia el lock del proyecto). Salida redirigida al scratchpad para no ensuciar el repo; `git status` confirma que solo quedaron modificados los archivos editados.
+  - Con los defines tal cual (incluyen `UNITY_EDITOR`): **0 errores**, unicos warnings los dos `CS0414` preexistentes de `JoystickAdapter`.
+  - Con los defines **sin `UNITY_EDITOR`** (simula build de player, que es el caso que estaba roto): **0 errores**. Aparecen 3 `CS0414` mas, todos preexistentes y ajenos a este cambio: el `in_position` privado de `Ctrl_ABB_SG`, `Ctrl_OnRobot_RG2` y `Ctrl_Robotiq_2F_85` (scripts originales del asset en `Assets/AssetsGripper/Script/`) queda sin uso al no compilarse el bloque de Editor.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**. En particular queda por confirmar en VR si `releaseOpeningDelta = 0.2` (~13° de apertura, ~0.07 s a la velocidad por defecto de 180) se siente inmediato al soltar o si conviene bajarlo.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: no se toco `JointPID`, `RobotDynamics`, la generacion de IK ni los limites de workspace/orientacion. El brazo sigue sin moverse por `Rigidbody` ni fuerzas. El unico efecto sobre la cadena de control es que, durante la suelta pendiente, `IsHoldingObject` sigue en `true` unos ~0.13 s mas, asi que la inercia y la penalizacion de velocidad por payload se descuentan al liberar la pieza y no al pulsar el boton (mas fiel a la fisica, no menos).
+- `debugTriggers` y `debug` se cambiaron solo en el **valor por defecto del script**. Las instancias ya presentes en la escena conservan el `true` serializado: hay que desmarcarlos a mano en el Inspector para que surta efecto.
+- Fuera de alcance, propuesto y no aplicado (bloques 2 y 3 de la revision): eleccion de la pieza mas cercana al `graspPoint` en vez de la primera del diccionario, incluir los bounds de la pieza agarrada en `ApplyCollisionVeto` (hoy se la puede empotrar lateralmente), herencia opcional de la velocidad del brazo al soltar, verificacion de escala del `graspPoint`, y feedback haptico/HUD al confirmar el agarre.
+
+---
+
+### 2026-08-16 (2) - Boton "Modo debug" en el menu de pausa
+
+Origen:
+- Pedido del usuario, a continuacion de la entrada anterior. Ahi habian quedado `debugTriggers` y `debug` en `false` por defecto, con la limitacion de que cambiarlos exige salir de Play Mode y tocar el Inspector componente por componente. `GrabbableSafetyGuard.logRecoveries` era peor: ese componente se auto-anade por codigo (`RuntimeInitializeOnLoadMethod`), asi que no tiene Inspector donde editarlo.
+
+Cambio probado:
+- `DebugSettings.cs` (nuevo): estatico con `PlayerPrefs`, mismo patron que `ProximitySlowdownSettings` y `GripperViewSettings`. `IsEnabled`, `SetEnabled`, `Toggle()`, `Describe()` y evento `EnabledChanged`. Default **apagado**: la consola arranca limpia y encenderlo es una accion explicita.
+- Consumidores: `GripperController` y `GripperTriggerForwarder` ganan una propiedad `LogEnabled => flagLocal || DebugSettings.IsEnabled`; `GrabbableSafetyGuard` evalua `logRecoveries || DebugSettings.IsEnabled` y su flag pasa a default `false` (antes logueaba siempre). **Los flags del Inspector se conservan como override por componente**, para poder aislar uno solo mientras se depura sin llenar la consola con el resto.
+- `PauseMenuController.cs`: nuevo `debugModeButton` con el ciclo completo del patron existente — campo `[SerializeField]`, `EnsureDebugModeButtonExists()` (para la escena que ya trae el panel armado), `ToggleDebugMode()` / `UpdateDebugModeButtonText()` / `BuildDebugModeLabel()`, alta en `WireButtons`, `ApplyButtonColors`, `RefreshSelectedTextColors`, `UpdateProfileUi`, el array de orden de `FindNextSelectable` (entre guias y Continuar) y `BuildDefaultMenu`. Altura del panel por defecto de 740 a 798 (46 de alto + 12 de spacing por boton).
+
+Archivos tocados:
+- `Assets/Scripts/DebugSettings.cs` (nuevo)
+- `Assets/Scripts/PauseMenuController.cs`
+- `Assets/Scripts/GripperController.cs`, `Assets/Scripts/GripperTriggerForwarder.cs`, `Assets/Scripts/GrabbableSafetyGuard.cs`
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: fila de `DebugSettings.cs` en la tabla de scripts.
+
+Resultado observado:
+- Compilacion **ejecutada**, con y sin `UNITY_EDITOR`: **0 errores** en ambos perfiles, mismos warnings preexistentes que en la entrada anterior (2 y 5 `CS0414`).
+- **Detalle de metodo a recordar:** el `Assembly-CSharp.csproj` que genera Unity enumera los `.cs` uno por uno, asi que un archivo **nuevo** no entra en la compilacion hasta que Unity regenera el proyecto. Hubo que anadir su `<Compile Include>` a mano para poder validar. El csproj esta en `.gitignore` (`*.csproj`) y Unity lo regenera al recompilar, asi que la edicion es transitoria e inocua.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**.
+
+Decision:
+- Alcance del "modo debug": solo **logs de runtime** de la cadena de agarre y de la recuperacion de piezas. Quedan deliberadamente fuera `GripperDistanceSensor.drawGizmos` (los gizmos solo se ven en la Scene view del Editor, no en Play ni en VR, asi que un boton en el menu de pausa no los alcanza) y `JoystickVibrationHidOutput.logConnection` (un unico log al conectar, diagnostico util siempre).
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: no toca la cadena de control. Solo condiciona llamadas a `Debug.Log`.
+- **A verificar en el Editor:** si `pauseMenuRoot` esta asignado en la escena, `EnsureDebugModeButtonExists()` inyecta el boton en el `Panel` existente. Si ese panel tiene altura fija en el `.unity` (y no un Content Size Fitter), puede que haya que subirla a mano para que no recorte "Continuar", igual que se hizo con la altura por defecto del menu construido por codigo.
+
+---
+
+### 2026-08-16 (3) - Comportamiento del agarre: pieza mas cercana, payload en el veto de colision, velocidad al soltar y escala
+
+Origen:
+- Pedido del usuario: implementar el bloque 2 de la revision del agarre (los cuatro puntos de "comportamiento", no bugs de compilacion).
+
+Sintomas / hallazgos:
+1. **Eleccion no determinista de la pieza.** `TryGrab()` recorria `fingerContacts` y agarraba la primera que cumpliera el criterio de contactos opuestos. El orden de iteracion de un `Dictionary` no esta definido: con dos piezas entre los dedos, cual se llevaba era arbitrario y no reproducible para el operario.
+2. **La pieza agarrada no participaba del veto de colision.** `ApplyCollisionVeto()` barre solo el volumen del efector, y la pieza, al pasar a colgar del robot, queda descartada por `IsObstacle()`. En vertical si estaba cubierta (el sensor inferior descuenta `GetPayloadExtent`), pero **lateralmente se podia empotrar la pieza dentro de una caja o contra una pared**.
+3. **La pieza caia en vertical al soltar** (velocidades forzadas a cero), perdiendo la inercia del brazo si el operario soltaba en movimiento.
+4. **`SetParent` no preserva la escala**: si el `graspPoint` arrastra una escala distinta de 1, la pieza se deforma al agarrarla.
+
+Cambio probado:
+- `GripperController.TryGrab()`: entre las candidatas validas se elige la de menor distancia al `graspPoint` en vez de la primera del diccionario.
+- `GripperController.TryGetPayloadBounds(out Bounds)` (nuevo, publico): AABB mundial de la pieza agarrada considerando solo colliders solidos, sobre un array de colliders cacheado por agarre (`payloadColliders`), porque lo consulta el veto en cada `FixedUpdate`.
+- `JoystickAdapter.ApplyCollisionVeto()`: segundo barrido `BoxCastNonAlloc` con el AABB de la pieza, en la misma direccion, tomando **el mas restrictivo** de los dos resultados. Nuevo flag `_includePayloadInCollisionVeto` (default `true`). El filtrado de impactos se extrajo a `NearestObstacleDistance(hitCount)` para que ambos barridos apliquen exactamente los mismos descartes (solapamiento en origen, `IsObstacle`, superficies horizontales) sin duplicar el codigo.
+- `GripperController`: `inheritReleaseVelocity` (default **`false`** = comportamiento actual) y `maxInheritedReleaseSpeed` (default 1.5 m/s). La velocidad se estima en `TrackGraspVelocity()` por diferencia de posicion del `graspPoint` entre ticks de fisica, siempre, haya pieza o no.
+- `GripperController`: `PreserveWorldScale()` tras el `SetParent` corrige la escala local para conservar la mundial y avisa por consola (bajo modo debug); al soltar se restaura la `localScale` exacta previa (`grabbedOriginalLocalScale`).
+
+Archivos tocados:
+- `Assets/Scripts/GripperController.cs`
+- `Assets/Scripts/JoystickAdapter.cs`: `_includePayloadInCollisionVeto`, `NearestObstacleDistance()`, segundo barrido en `ApplyCollisionVeto()`.
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: seccion de anticolision y "Ciclo de agarre y suelta" ampliadas.
+
+Decisiones de diseno a tener presentes:
+- **BoxCast con el AABB real y no un `_collisionProbeRadius` mayor.** Inflar la esfera habria penalizado tambien al gripper vacio, frenandolo lejos de todo cuando no lleva nada.
+- **El barrido de la pieza hereda el descarte de superficies horizontales.** Es intencional: el descenso lo sigue gobernando el bloqueo de descenso, que ya descuenta cuanto sobresale la pieza. Vetar horizontales aqui impediria depositarla.
+- **El solapamiento en origen se ignora tambien para la pieza.** Una pieza apoyada en una mesa arranca solapando; tratarlo como obstaculo dejaria el brazo clavado al recogerla.
+- **`inheritReleaseVelocity` queda apagado por defecto.** Heredar la velocidad es mas realista, pero para formacion es mas util que la pieza caiga donde el operario la solto. Queda a un clic en el Inspector.
+
+Resultado observado:
+- Compilacion **ejecutada** con y sin `UNITY_EDITOR`: **0 errores** en ambos perfiles, mismos warnings preexistentes (2 y 5 `CS0414`). Unity ya habia regenerado el `csproj` por su cuenta e incluido `DebugSettings.cs`, asi que esta vez no hizo falta tocarlo.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**. Conviene probar en particular: (a) llevar una pieza contra una pared lateral y comprobar que aparece "OBSTACULO" antes de penetrarla; (b) que recoger una pieza del suelo o de una mesa sigue siendo posible (que el nuevo barrido no bloquee de mas); (c) que el aviso de escala **no** aparece, lo que confirmaria que la jerarquia del `graspPoint` esta limpia.
+- **Dependencia a recordar:** el veto solo actua sobre las layers de `_obstacleMask` (por defecto solo `Entorno`, 6). Mientras no se haya ejecutado `Tools > Entorno > Generar colliders faltantes` —que segun la entrada del 2026-08-15 seguia pendiente— el segundo barrido no tiene nada que golpear y no se notara ningun cambio.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: el segundo barrido se aplica sobre la trayectoria cartesiana **antes de la IK, nunca por joint**, igual que el clamp de workspace, el bloqueo de descenso y el veto ya existente. No se toco `JointPID`, `RobotDynamics`, la generacion de IK ni los limites de workspace/orientacion. El brazo sigue sin moverse por `Rigidbody` ni fuerzas. Con `_includePayloadInCollisionVeto` en `false`, o sin pieza agarrada, el comportamiento es identico al anterior.
+- Fuera de alcance, sigue pendiente del bloque 3: feedback haptico/HUD al confirmar el agarre.
+
+---
+
+### 2026-08-16 (4) - No se podia bajar lo suficiente para depositar la pieza
+
+Sintoma reportado por el usuario:
+- "No me deja bajar lo suficiente con el objeto agarrado, me frena el movimiento por seguridad; el problema es que no logro acercar lo suficiente el objeto al lugar donde debo dejarlo".
+
+Diagnostico:
+- **`ApplyDescentLimit()` usaba el mismo margen con la garra vacia que con una pieza agarrada.** La condicion de entrada es `IsGripperClosed`, que es cierta en ambos casos, y el margen era siempre `DescentMarginMeters` (5 cm por defecto).
+- Ese margen esta pensado para una maniobra concreta: que el gripper **vacio** no se estrelle contra el suelo al bajar a recoger. Con una pieza agarrada la maniobra es la **contraria** —hay que apoyarla— y ademas el sensor ya descuenta cuanto sobresale la pieza (`GetPayloadExtent`), asi que el hueco medido es el que queda **bajo la pieza**. Reservar 5 cm de ese hueco significa frenar con la pieza a 5 cm de la mesa: depositarla con precision era imposible, habia que soltarla desde ahi y dejarla caer.
+- No es un bug de calculo del sensor ni del descuento del payload: ambos median bien. Es que un unico parametro estaba gobernando dos maniobras opuestas.
+
+Cambio probado:
+- `ProximitySlowdownSettings.cs`: nuevo `CarryDescentMarginMeters` (clave propia en `PlayerPrefs`, default **5 mm**) con sus presets `{5 mm, 1 cm, 2 cm, 3 cm, 0}`. Nuevos `GetDescentMargin(bool isCarryingPayload)` e `IsDescentBlockEnabledFor(bool)` como **unico punto de decision**, para que el bloqueo y su HUD no puedan discrepar. `DescribeCarryDescentMargin()` formatea en milimetros: en centimetros los presets se leerian todos "0 cm".
+- `JoystickAdapter.ApplyDescentLimit()`: elige margen y enable segun `_gripperController.IsHoldingObject`. El chequeo de enable se movio **despues** de resolver si se lleva pieza, porque ahora depende de eso.
+- `PauseMenuController.cs`: boton "Bloqueo c/pieza: N mm" con el ciclo completo del patron (campo, `EnsureCarryDescentMarginButtonExists()`, cycle/update/label, `WireButtons`, colores, orden de navegacion y `BuildDefaultMenu`). Altura del panel por defecto de 798 a 856.
+
+Archivos tocados:
+- `Assets/Scripts/ProximitySlowdownSettings.cs`, `Assets/Scripts/JoystickAdapter.cs`, `Assets/Scripts/PauseMenuController.cs`
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: tabla de los dos margenes en "Bloqueo de descenso" y fila actualizada en la tabla de scripts.
+
+Resultado observado:
+- Compilacion **ejecutada** con y sin `UNITY_EDITOR`: **0 errores**, mismos warnings preexistentes.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**. Con 5 mm la pieza deberia poder apoyarse practicamente sobre la superficie; si aun asi frena antes de tiempo, el boton permite bajar a 0 (desactivado) para descartar el bloqueo de descenso como causa.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: mismo mecanismo y mismo punto de aplicacion (sobre `deltaWorld`, en mundo, antes de la IK, nunca por joint). Solo cambia **que valor** de margen se usa. Sin pieza agarrada el comportamiento es identico al anterior.
+- **Hipotesis alternativa que queda descartable con una prueba**, por si el sintoma persiste: el aviso del HUD distingue "DESCENSO BLOQUEADO" (este mecanismo) de "OBSTACULO" (`ApplyCollisionVeto`). Si lo que aparece es "OBSTACULO", la causa seria el barrido de la pieza agregado en la entrada anterior —por ejemplo al depositar en un hueco ajustado, si el `BoxCast` roza una pared vertical, cuya normal no se descarta por no ser horizontal— y se desactiva con `_includePayloadInCollisionVeto`.
+
+---
+
+### 2026-08-16 (5) - El brazo atraviesa el suelo: piso duro geometrico
+
+Sintoma reportado por el usuario:
+- "Por que atravieso el suelo?".
+
+Diagnostico (verificado, no supuesto):
+- **`Assets/RPG_FPS_game_assets_industrial/Map_v2.unity` tiene UN solo collider en toda la escena.** La herramienta `Tools > Entorno > Generar colliders faltantes`, creada el 2026-08-15, **sigue sin ejecutarse**; ya quedo anotado como pendiente en aquella entrada y en la del veto con payload.
+- Las tres protecciones existentes son **reactivas** y por tanto ninguna puede actuar sin colliders:
+  1. `ApplyDescentLimit()` sale por `!_proximitySensor.HasHit`: sin collider el sensor no ve el suelo.
+  2. `ApplyCollisionVeto()` no tiene contra que barrer, y ademas descarta las superficies horizontales por diseno (delega el suelo en el mecanismo anterior).
+  3. El clamp de workspace **no es un limite de suelo**: `_minHeight` (-0.2) esta en el **frame del robot**, no en mundo, asi que permite bajar por debajo de la cota del suelo.
+- Es decir: no habia ningun limite absoluto de altura. El sintoma no depende de los cambios recientes; es preexistente y se hizo evidente al poder bajar mas con la pieza.
+
+Cambio probado:
+- `JoystickAdapter.ApplyHardFloorLimit()` (nuevo): cuarto mecanismo que recorta `deltaWorld` antes de la IK. Impide que el punto mas bajo del gripper o de la pieza baje de `_hardFloorWorldY + _hardFloorClearance` (defaults `0` y `5 mm`). Se llama **despues** de `ApplyDescentLimit()`, que resetea `IsDescentBlocked` al entrar, para que el aviso del HUD sobreviva cuando quien frena es el piso.
+- `GripperController.TryGetGripperBounds()` (nuevo) + refactor de `TryGetPayloadBounds()` sobre un `TryEncapsulate(colliders, includeTriggers)` comun. Los colliders del gripper se cachean en `Awake()`, cuando todavia no cuelga ninguna pieza, asi que nunca contaminan la medida con la carga.
+- **Los triggers SI cuentan para el gripper y NO para el payload.** Los volumenes de las caras internas de los dedos son triggers y son justamente la parte mas baja de la garra, que es lo que interesa para el piso.
+
+Archivos tocados:
+- `Assets/Scripts/JoystickAdapter.cs`: `_enableHardFloor`, `_hardFloorWorldY`, `_hardFloorClearance`, `HardFloorWorldY`, `ApplyHardFloorLimit()`.
+- `Assets/Scripts/GripperController.cs`: `gripperColliders`, `TryGetGripperBounds()`, `TryEncapsulate()`.
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: nueva seccion "Piso duro".
+
+Resultado observado:
+- Compilacion **ejecutada** con y sin `UNITY_EDITOR`: **0 errores**, mismos warnings preexistentes.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: mismo patron que los otros tres limites —sobre `deltaWorld`, en mundo, antes de la IK, nunca por joint—. No se toco `JointPID`, `RobotDynamics` ni la generacion de IK. El brazo sigue sin moverse por `Rigidbody` ni fuerzas.
+- **El piso duro es una red de seguridad, no el arreglo de fondo.** Solo protege del plano del suelo: mesas, palés, cajas y cualquier otra superficie elevada se siguen atravesando. Para eso hace falta ejecutar la herramienta de colliders, que es lo que activa el sensor y el veto. Conviene mantener el piso duro igualmente aun despues de generarlos, como respaldo determinista.
+- **Deuda conocida:** la cota del suelo esta ahora en TRES sitios independientes (`_hardFloorWorldY`, `GrabbableSafetyGuard.minimumWorldY`, `GripperController.minimumReleaseWorldY`), los tres con default `0`. Si algun dia se mueve el nivel del suelo hay que tocar los tres. Unificarlos en un estatico compartido seria el paso natural, no se hizo aqui por no ampliar el alcance del arreglo.
+
+---
+
+### 2026-08-16 (6) - Tras generar los colliders, sigue sin colisionar con nada salvo el piso
+
+Sintoma reportado por el usuario:
+- "Fue error mio, nunca use la herramienta; de todas formas acabo de usarla y no colisiono con nada, solo con el piso" (el piso es el limite geometrico de la entrada anterior, que no depende de colliders).
+
+Estado verificado en disco (datos, no suposiciones):
+- `Map_v2.unity` **sigue teniendo 1 solo collider**. La herramienta llama a `MarkSceneDirty` pero **no guarda**: si el usuario no hace `Ctrl+S` sobre `Map_v2`, los colliders viven solo en la sesion del Editor. En Play Mode funcionarian igual (se usa la escena en memoria), pero se pierden al cerrar.
+- `Planta.unity`: `_endEffector` **asignado**; el sensor que frena tiene `detectionMask.m_Bits = 73` (Default + Manipulable + **Entorno**) y `maxDistance = 1`. La edicion de la mascara del 2026-08-15 sobrevivio.
+- El bloque serializado del `JoystickAdapter` **termina en `_safetyDriftMaxTolerance`**: los campos de anticolision no estan en el YAML, porque la escena no se guarda desde antes de que se anadieran. Al cargar toman los inicializadores del script (`_enableCollisionVeto = true`, `_obstacleMask = 1 << 6`), que son los correctos.
+- Conclusion: **la configuracion es correcta**, asi que el sintoma no se explica por parametros. Faltan datos de runtime.
+
+Causas candidatas, en orden de probabilidad:
+1. **La herramienta se ejecuto sin `Map_v2` cargada.** El entorno vive en `Map_v2`, no en `Planta`. La herramienta recorre solo las escenas cargadas y no avisa de nada: informa de los pocos objetos que encontro y termina. El numero que imprimio en el log es el dato decisivo.
+2. **El veto solo vigila el gripper y su pieza**, no los eslabones del brazo. Golpear una estanteria con el codo no frena nada. Es una limitacion ya documentada, pero es facil leerla como "no colisiona".
+3. **Las superficies horizontales las descarta el veto por diseno** (`_floorNormalThreshold`): apoyarse sobre una mesa no lo gobierna el veto sino el bloqueo de descenso via sensor.
+
+Cambio probado:
+- `Assets/Editor/EnvironmentColliderTool.cs`: nuevo menu `Tools > Entorno > Diagnosticar anticolision`. Imprime escenas cargadas (y cuales NO lo estan), por escena el numero de mallas candidatas / con collider / en layer `Entorno`, la `_obstacleMask` y `_endEffector` del adapter, la `detectionMask` y `maxDistance` del sensor que frena, y un recordatorio de los dos limites por diseno. Lee los `[SerializeField]` privados via `SerializedObject`.
+- `_ARQUITECTURA_CONTROL.md`: aviso de que la herramienta opera sobre escenas cargadas y no guarda.
+
+Resultado observado:
+- Compilacion de `Assembly-CSharp-Editor` **ejecutada**: 0 errores.
+- Pendiente: la salida del diagnostico en la maquina del usuario. Sin ese dato no se puede cerrar el caso.
+
+Decision:
+- **No se toco la cadena de control.** Hasta aqui se habian hecho dos diagnosticos por deduccion sobre el estado del entorno; el segundo (colliders ausentes) resulto correcto pero incompleto. Antes de seguir cambiando codigo de control conviene tener el estado real de la escena, que es justo lo que imprime el menu nuevo.
+
+---
+
+### 2026-08-16 (7) - Giro de camara (yaw) para el perfil VR2
+
+Pedido del usuario:
+- Que en **modo camara** se pueda rotar la vista alrededor del eje Y con el VR2, cosa que el perfil PS4 ya permitia. Tras una aclaracion suya, el eje asignado es **"Mover Y"** (la primera propuesta fue "Mover Z" y la descarto).
+
+Diagnostico:
+- El yaw de la camara lo produce `CameraJoystickController` a partir de `_viewSide`, que en PS4 es el horizontal del stick derecho. **El VR2 no tiene segundo stick**, asi que en `InputProfileSwitcher.TryBuildProfile()` el perfil VR2 dejaba `ViewUp` y `ViewSide` en `null` y no habia forma de girar la vista.
+- De los tres ejes del VR2, el modo camara solo usaba dos: `MoveForward` = "Mover X" y `MoveSide` = "Mover Z". **"Mover Y" estaba sin usar en modo camara**, asi que asignarlo al yaw no le quita nada a los controles existentes.
+
+Cambio probado:
+- `InputProfileSwitcher.cs`, perfil VR2: `ViewSide = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Y")`. Una linea; `CameraJoystickController` ya sabia hacer el yaw, solo le faltaba la accion.
+- `ControlGuidePanel.cs`: nuevo item en `Vr2Items`, "Girar Camara: Palanca Altura (en modo camara)". Pasa de 5 a 6 items; `ApplyDefaultItems` recorre las filas fijas de la escena, que son al menos 7 porque PS4 tiene 7, asi que entra sin clonar plantillas.
+
+Archivos tocados:
+- `Assets/Scripts/InputProfileSwitcher.cs`, `Assets/Scripts/ControlGuidePanel.cs`
+
+Resultado observado:
+- Compilacion **ejecutada** con y sin `UNITY_EDITOR`: **0 errores**, mismos warnings preexistentes.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**. A confirmar el **sentido de giro**: `CameraJoystickController` hace `transform.Rotate(Vector3.up, viewSide * _lookSpeed * dt)` sin opcion de inversion, asi que si en el VR2 la palanca de altura queda invertida respecto de lo esperado hay que anadir un flag de inversion (el `_invertMoveY` del `JoystickAdapter` no aplica aqui, es de otro componente).
+
+Decision:
+- **Solo afecta al modo camara.** `CameraJoystickController.Update()` sale por `!JoystickAdapter.IsCameraMode`, asi que en modo robot "Mover Y" sigue moviendo el TCP en vertical exactamente igual que antes. No se toco `JoystickAdapter` ni nada de la cadena de control.
+- `ViewUp` (pitch) sigue en `null` para VR2: no se pidio, y el VR2 no tiene un cuarto eje libre donde ponerlo sin quitarselo a otra funcion.
+
+---
+
+### 2026-08-16 (8) - Ejes de camara VR2 intercambiados y sentido de giro de J6 corregido
+
+Pedido del usuario (dos cosas):
+1. En **modo camara**, intercambiar los roles: `MoveForward` debe ser "Mover Z" y `MoveSide` "Mover X" (antes al reves). Explicitamente **no** se tocan los input actions, solo el mapeo del modo camara.
+2. Invertir el sentido de giro del **modo J6**: "cuando realizo movimiento horario en el joystick, J6 se mueve antihorario".
+
+Cambio probado:
+- `InputProfileSwitcher.cs`, perfil VR2: `MoveForward = "Mover Z"`, `MoveSide = "Mover X"`. `ViewSide` sigue en "Mover Y" (entrada anterior). Como los roles del modo robot (`MoveX`/`MoveY`/`MoveZ`) se resuelven por separado unas lineas mas arriba, el intercambio **no afecta al movimiento del brazo**: solo lo consume `CameraJoystickController`, que sale por `IsCameraMode`.
+- `JoystickAdapter.UpdateJ6ExclusiveControl()`: `float targetDelta = deltaStick * 0.25f` (antes `-deltaStick * 0.25f`). El gear ratio 1:4 no cambia.
+
+Hallazgo colateral que confirma que la correccion va en la direccion correcta:
+- La rama de **botones** del mismo metodo (`_j6AntiHorAction` resta, `_j6HorAction` suma, y luego `_j6TargetAngle += buttonInput * 45 * dt`) **nunca estuvo invertida**. O sea, el analogico y los botones L1/R1 movian J6 en sentidos opuestos entre si. Quitar el negativo no solo arregla lo reportado, ademas deja las dos entradas coherentes.
+
+Archivos tocados:
+- `Assets/Scripts/InputProfileSwitcher.cs`, `Assets/Scripts/JoystickAdapter.cs`
+
+Resultado observado:
+- Compilacion **ejecutada** con y sin `UNITY_EDITOR`: **0 errores**, mismos warnings preexistentes.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**, en particular que el analogico y los botones L1/R1 (perfil PS4) giren ahora en el mismo sentido.
+
+Decision:
+- Nota de compatibilidad con `_ARQUITECTURA_CONTROL.md`: el cambio de J6 es de **signo del incremento de `_j6TargetAngle`**, dentro del modo J6 exclusivo. No se tocaron el gear ratio, los limites `_j6MinLimit`/`_j6MaxLimit`, el unwrap del angulo del stick, el reseteo a 17.7 ni `JointPID`. El mapeo de camara no toca la cadena de control en absoluto.
+
+---
+
+### 2026-08-16 (9) - REGRESION PROPIA: los botones PS4/VR-2 se salieron de la pantalla
+
+Sintoma reportado por el usuario:
+- "Por que no funciona cambiar el joystick desde el menu pausa? antes funcionaba".
+
+Diagnostico (regresion introducida en las entradas (2) y (4) de hoy):
+- En la escena, `PauseMenuController.pauseMenuRoot` es **`fileID: 0`**, es decir null: el menu **no existe en el `.unity`**, lo construye entero `BuildDefaultMenu()` por codigo, incluidos `ps4Button` y `vr2Button`.
+- El panel se creaba con **altura fija y anclado al centro**. Al anadir el boton de modo debug y el de bloqueo con pieza hubo que subirla a mano dos veces: **740 -> 798 -> 856**.
+- El `CanvasScaler` de la escena es **`m_UiScaleMode: 0` (ConstantPixelSize) con `m_ScaleFactor: 1`**: no escala nada, 1 unidad de UI = 1 pixel real de ventana, y el `m_ReferenceResolution: {800, 600}` es decorativo en ese modo. Un panel de 856 px no entra en una Game view normal.
+- Como el panel esta **centrado**, el excedente se reparte arriba y abajo. Lo que se salia por arriba era el titulo, "Joystick: ..." y **justo la fila PS4/VR-2**: invisible e inclicable. Los botones anadidos van al final, por eso esos si se veian y parecia que solo fallaba el cambio de joystick.
+
+Cambio probado:
+- `PauseMenuController.BuildDefaultMenu()`: el panel deja de tener altura fija y pasa a **estirarse en vertical con el canvas** (`anchorMin.y = 0`, `anchorMax.y = 1`, `sizeDelta.y = -2 * PanelVerticalMargin`). Anadir opciones ya no exige recalcular ninguna altura y el panel no puede volver a salirse de la pantalla.
+- Menu compactado para que el contenido entre con holgura: constantes `ButtonHeight` 46 -> **40**, `LayoutSpacing` 12 -> **8**, padding vertical 24 -> 16, titulo 34 -> 28, etiqueta de boton 20 -> 18, `CalibrationStatus` 98 -> 56. El total pasa de ~852 a ~706 px.
+- Se mantiene `childAlignment = UpperCenter` **a proposito**, y ahora esta comentado en el codigo: si algun dia el contenido no entra, lo que se pierde es lo de abajo, nunca los botones de perfil.
+
+Archivos tocados:
+- `Assets/Scripts/PauseMenuController.cs`
+
+Resultado observado:
+- Compilacion **ejecutada** con y sin `UNITY_EDITOR`: **0 errores**.
+- Comportamiento en Play Mode: **pendiente de validar por el usuario**.
+
+Leccion para no repetirlo:
+- **Con `ConstantPixelSize`, cualquier alto fijo en la UI es una apuesta sobre el tamano de la ventana.** Anadir una opcion al menu de pausa no debe implicar tocar un numero magico de altura. Si en el futuro el menu vuelve a crecer y deja de entrar en pantallas bajas, el paso siguiente es meter el contenido en un `ScrollRect`, no volver a subir la altura.
+- El diff de la escena (`git diff` sobre `Planta.unity`) confirmo ademas que al guardarla solo se anadieron campos nuevos con sus defaults correctos: `_obstacleMask` 64, `_enableHardFloor` 1, `_hardFloorWorldY` 0, `releaseOpeningDelta` 0.2. Ninguna referencia se perdio.
+
+---
+
+### 2026-08-16 (10) - El menu de pausa navega pero no ejecuta ninguna accion
+
+Sintoma precisado por el usuario:
+- "Antes podia cambiar de joystick aunque no estuviese ese seleccionado (...). Ahora solo me deja abrir el menu pausa y navegar, pero no puedo realizar ninguna accion".
+
+Correccion del diagnostico anterior:
+- La entrada (9) atribuyo el sintoma al panel saliendose de pantalla. **Esa no era la causa**: el problema no es de visibilidad sino del **submit**, que no se ejecuta sobre ningun boton. El arreglo de anclaje de (9) se mantiene porque es correcto por si mismo, pero no explicaba esto.
+- Se reviso el diff completo de los dos archivos tocados contra `3da6040` (el commit anterior a todo el trabajo de hoy): `InputProfileSwitcher` solo cambia el mapeo de camara del VR2, y `PauseMenuController` solo anade botones, colores y layout. **Ninguno toca el camino del submit**, que va por las acciones globales `Ps4Click` / `Vr2Click`, no modificadas. Tambien se verifico que la action "Click" existe en `PS4Joystick.inputactions`, asi que `Resolve` no devuelve null.
+
+Causa candidata identificada por lectura del guard (a confirmar en Play Mode):
+- `SubmitSelected()` pone `_ignoreMenuSubmitUntilRelease = true` para que una pulsacion no cuente dos veces, y ese flag **solo se libera cuando `ReadMenuSubmitPressed()` deja de leer pulsado**. Pero esa lectura es de **nivel** y hace `Ps4Click >= threshold || Vr2Click >= threshold`: **basta con que uno de los dos quede pegado en alto** (mando desconectado, eje flotante, contacto normalmente cerrado en el VR2 industrial) para que el flag no se libere jamas y bloquee **todos** los submits, tambien los del otro mando.
+- Encaja con el sintoma completo: la navegacion (`ReadMenuHorizontal`/`Vertical`) y la pausa (`WasPausePressedThisFrame`) **no pasan por ese guard**, por eso siguen respondiendo. Y explica el "antes funcionaba" sin que el codigo del submit haya cambiado: depende del estado del hardware, no del codigo.
+
+Cambio probado:
+- `PauseMenuController.Update()`: el guard se libera al soltar **o** por timeout (`MenuSubmitReleaseTimeout`, 0.5 s). Es seguro porque la deteccion del submit ya es **por flanco** (`WasMenuSubmitPressedThisFrame`), asi que soltar el guard antes no puede duplicar pulsaciones. Si salta por timeout con el boton aun en alto, se avisa por consola (bajo modo debug) senalando que un click esta quedandose pegado.
+- Logs de diagnostico bajo `DebugSettings.IsEnabled`: uno al ejecutar el submit (con el nombre del boton) y otro cuando se pulsa confirmar sobre algo no interactuable. Sirven para distinguir de un vistazo entre "el input no llega" y "el input llega pero el boton no responde".
+
+Archivos tocados:
+- `Assets/Scripts/PauseMenuController.cs`
+
+Resultado observado:
+- Compilacion **ejecutada** con y sin `UNITY_EDITOR`: **0 errores**.
+- **Pendiente de confirmar en Play Mode.** Con el modo debug encendido: si aparece el warning del timeout, la causa era el click pegado y queda confirmada. Si no aparece ningun log al pulsar confirmar, el input no esta llegando y hay que mirar el binding de "Click"/"Camera Toggle" en los assets. Si aparece "Submit sobre 'X'" pero no pasa nada, el fallo esta en el `onClick` de ese boton concreto.
+
+Leccion:
+- **Un guard "hasta soltar" que mira el nivel de varias fuentes a la vez es un punto unico de fallo.** Si cualquiera de ellas puede quedarse en alto, bloquea la interaccion entera y el sintoma aparece lejos de la causa. Con deteccion por flanco disponible, el guard de nivel sobra o debe llevar tope temporal.

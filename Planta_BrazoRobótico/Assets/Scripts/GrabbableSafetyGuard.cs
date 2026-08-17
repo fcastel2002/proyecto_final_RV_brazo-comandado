@@ -33,8 +33,9 @@ public class GrabbableSafetyGuard : MonoBehaviour
 	[SerializeField]
 	private LayerMask supportLayers = ~0;
 
+	[Tooltip("Fuerza los logs de recuperación aunque el modo debug global del menú de pausa esté apagado.")]
 	[SerializeField]
-	private bool logRecoveries = true;
+	private bool logRecoveries;
 
 	private const float ProbeStartHeight = 0.05f;
 	private readonly RaycastHit[] supportHits = new RaycastHit[8];
@@ -161,7 +162,7 @@ public class GrabbableSafetyGuard : MonoBehaviour
 		objectRigidbody.angularVelocity = Vector3.zero;
 		Physics.SyncTransforms();
 
-		if (logRecoveries)
+		if (logRecoveries || DebugSettings.IsEnabled)
 		{
 			Debug.LogWarning($"[GrabbableSafetyGuard] {name} fue recuperado al salir del mapa.");
 		}

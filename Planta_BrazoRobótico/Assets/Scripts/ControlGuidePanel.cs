@@ -33,7 +33,8 @@ public class ControlGuidePanel : MonoBehaviour
         "• <b>Mover TCP (Y):</b> Palanca Altura",
         "• <b>Abrir/Cerrar Garra:</b> Trigger Gripper",
         "• <b>Hold Gripper (1s):</b> Homing J6",
-        "• <b>Cámara/Modo:</b> Botón Menú / Toggle"
+        "• <b>Cámara/Modo:</b> Botón Menú / Toggle",
+        "• <b>Girar Cámara:</b> Palanca Altura (en modo cámara)"
     };
 
     public void SetProfile(InputProfileSwitcher.InputProfileKind profile)

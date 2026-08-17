@@ -58,6 +58,9 @@ $RECYCLE.BIN/
 *.SLDASM
 *.AMF
 
+# === Plastic SCM (Unity Version Control) - estado local, no versionar ===
+Planta_BrazoRobótico/.plastic/
+
 # === Archivos locales para agentes ===
 **/AGENTS.md
 **/CLAUDE.md
