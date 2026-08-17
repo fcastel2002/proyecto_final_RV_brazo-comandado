@@ -40,6 +40,15 @@ public class GripperController : MonoBehaviour
 	[Min(0.05f)]
 	private float releaseTimeout = 1f;
 
+	[Tooltip("Al soltar, la pieza hereda la velocidad del punto de agarre. Desactivado cae en vertical, que es más predecible para formación.")]
+	[SerializeField]
+	private bool inheritReleaseVelocity;
+
+	[Tooltip("Tope (m/s) de la velocidad heredada al soltar.")]
+	[SerializeField]
+	[Min(0f)]
+	private float maxInheritedReleaseSpeed = 1.5f;
+
 	[Header("Debug")]
 	[Tooltip("Fuerza los logs de este componente aunque el modo debug global del menú de pausa esté apagado.")]
 	[SerializeField]
@@ -50,10 +59,17 @@ public class GripperController : MonoBehaviour
 
 	private GameObject grabbedObject;
 	private Rigidbody grabbedRigidbody;
+	private Collider[] payloadColliders;
+	private Collider[] gripperColliders;
 	private float originalMass;
 	private bool grabbedWasKinematic;
+	private Vector3 grabbedOriginalLocalScale;
 	private float pickupMinimumY;
 	private float gripperBaseMass;
+
+	private Vector3 lastGraspPosition;
+	private Vector3 graspVelocity;
+	private bool hasLastGraspPosition;
 
 	private bool isGripperClosed = true;
 	private bool isClosing;
@@ -89,6 +105,10 @@ public class GripperController : MonoBehaviour
 		// Masa del gripper vacío. La masa con carga se reasigna siempre como base + payload en vez de
 		// acumular sumas y restas, que derivan si algún agarre y su suelta no se emparejan.
 		if (gripperRigidbody != null) gripperBaseMass = gripperRigidbody.mass;
+
+		// Se cachea en Awake, cuando todavía no cuelga ninguna pieza del gripper: así estos colliders
+		// son siempre los del gripper y nunca los de la carga, que se mide aparte.
+		gripperColliders = GetComponentsInChildren<Collider>();
 	}
 
 	public void ToggleGrip()
@@ -154,18 +174,29 @@ public class GripperController : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// Entre todas las piezas que cumplen el criterio de contactos opuestos, se agarra la más cercana
+	/// al punto de agarre. Antes se tomaba la primera del diccionario, y el orden de iteración de un
+	/// Dictionary no está definido: con dos piezas entre los dedos, cuál se llevaba era arbitrario y
+	/// no reproducible para el operario.
+	/// </summary>
 	private void TryGrab()
 	{
 		if (grabbedObject != null || !isClosing) return;
 
+		Vector3 referencePoint = graspPoint != null ? graspPoint.position : transform.position;
 		GameObject objectToGrab = null;
+		float bestSqrDistance = float.MaxValue;
+
 		foreach (KeyValuePair<GameObject, HashSet<GripperTriggerForwarder>> entry in fingerContacts)
 		{
-			if (HasOpposingInnerContacts(entry.Value))
-			{
-				objectToGrab = entry.Key;
-				break;
-			}
+			if (entry.Key == null || !HasOpposingInnerContacts(entry.Value)) continue;
+
+			float sqrDistance = (entry.Key.transform.position - referencePoint).sqrMagnitude;
+			if (sqrDistance >= bestSqrDistance) continue;
+
+			bestSqrDistance = sqrDistance;
+			objectToGrab = entry.Key;
 		}
 
 		if (objectToGrab != null)
@@ -217,6 +248,9 @@ public class GripperController : MonoBehaviour
 		isReleasing = false;
 		grabbedObject = objectToGrab;
 		grabbedRigidbody = grabbedObject.GetComponent<Rigidbody>();
+		// Se cachea una sola vez por agarre: TryGetPayloadBounds() lo consulta desde el veto de
+		// colisión, que corre en cada FixedUpdate.
+		payloadColliders = grabbedObject.GetComponentsInChildren<Collider>();
 		Physics.SyncTransforms();
 		pickupMinimumY = GetLowestSolidPoint(grabbedObject);
 
@@ -241,7 +275,10 @@ public class GripperController : MonoBehaviour
 
 		// Emparentar para movimiento 1:1 perfecto
 		Transform parent = graspPoint != null ? graspPoint : transform;
+		Vector3 worldScaleBefore = grabbedObject.transform.lossyScale;
+		grabbedOriginalLocalScale = grabbedObject.transform.localScale;
 		grabbedObject.transform.SetParent(parent);
+		PreserveWorldScale(grabbedObject.transform, worldScaleBefore);
 
 		if (LogEnabled) Debug.Log($"[GripperController] GrabObject: grabbed {grabbedObject.name} (Mass: {originalMass} transferred to gripper)");
 
@@ -321,8 +358,9 @@ public class GripperController : MonoBehaviour
 		{
 			MoveGrabbedObjectToSafeReleaseHeight();
 
-			// Desemparentar
+			// Desemparentar y devolver la escala local exacta que tenía antes del agarre.
 			grabbedObject.transform.SetParent(null);
+			grabbedObject.transform.localScale = grabbedOriginalLocalScale;
 
 			if (grabbedRigidbody != null)
 			{
@@ -330,7 +368,9 @@ public class GripperController : MonoBehaviour
 				grabbedRigidbody.isKinematic = grabbedWasKinematic;
 				if (!grabbedWasKinematic)
 				{
-					grabbedRigidbody.linearVelocity = Vector3.zero;
+					grabbedRigidbody.linearVelocity = inheritReleaseVelocity
+						? Vector3.ClampMagnitude(graspVelocity, maxInheritedReleaseSpeed)
+						: Vector3.zero;
 					grabbedRigidbody.angularVelocity = Vector3.zero;
 				}
 				grabbedRigidbody = null;
@@ -341,8 +381,10 @@ public class GripperController : MonoBehaviour
 		}
 
 		grabbedRigidbody = null;
+		payloadColliders = null;
 		originalMass = 0f;
 		grabbedWasKinematic = false;
+		grabbedOriginalLocalScale = Vector3.one;
 
 		// Devolver el gripper a su masa en vacío. Fuera del if para cubrir también el caso de que la
 		// pieza haya sido destruida mientras estaba tomada.
@@ -357,6 +399,111 @@ public class GripperController : MonoBehaviour
 		if (gripperRigidbody == null) return;
 
 		gripperRigidbody.mass = gripperBaseMass + GrabbedMass;
+	}
+
+	/// <summary>
+	/// AABB mundial de la pieza agarrada, considerando solo colliders sólidos. Devuelve false si no hay
+	/// pieza o no tiene ninguno.
+	///
+	/// Lo consume <see cref="JoystickAdapter"/> para incluir el volumen de la pieza en el veto de
+	/// colisión: al agarrarla pasa a colgar del robot, así que el barrido del gripper la descarta como
+	/// obstáculo y sin esto se la puede empotrar lateralmente contra el entorno.
+	/// </summary>
+	public bool TryGetPayloadBounds(out Bounds bounds)
+	{
+		bounds = default;
+		if (grabbedObject == null) return false;
+
+		return TryEncapsulate(payloadColliders, false, out bounds);
+	}
+
+	/// <summary>
+	/// AABB mundial del propio gripper. A diferencia del payload aquí SÍ se cuentan los triggers: los
+	/// volúmenes de las caras internas de los dedos son triggers y son justamente la parte más baja de
+	/// la garra, que es lo que interesa para el piso duro.
+	/// </summary>
+	public bool TryGetGripperBounds(out Bounds bounds)
+	{
+		return TryEncapsulate(gripperColliders, true, out bounds);
+	}
+
+	private static bool TryEncapsulate(Collider[] colliders, bool includeTriggers, out Bounds bounds)
+	{
+		bounds = default;
+		if (colliders == null) return false;
+
+		bool hasBounds = false;
+		for (int colliderIndex = 0; colliderIndex < colliders.Length; colliderIndex++)
+		{
+			Collider candidate = colliders[colliderIndex];
+			if (candidate == null || !candidate.enabled) continue;
+			if (candidate.isTrigger && !includeTriggers) continue;
+
+			if (hasBounds)
+			{
+				bounds.Encapsulate(candidate.bounds);
+			}
+			else
+			{
+				bounds = candidate.bounds;
+				hasBounds = true;
+			}
+		}
+
+		return hasBounds;
+	}
+
+	/// <summary>
+	/// <c>SetParent</c> preserva la pose mundial pero NO la escala: si el punto de agarre arrastra una
+	/// escala distinta de 1, la pieza se deforma en el momento de agarrarla. Se corrige la escala local
+	/// para que la escala mundial siga siendo la de antes de emparentar.
+	/// </summary>
+	private void PreserveWorldScale(Transform target, Vector3 worldScaleBefore)
+	{
+		Vector3 worldScaleAfter = target.lossyScale;
+		if (IsApproximately(worldScaleAfter, worldScaleBefore)) return;
+
+		Vector3 localScale = target.localScale;
+		target.localScale = new Vector3(
+			RescaleAxis(localScale.x, worldScaleBefore.x, worldScaleAfter.x),
+			RescaleAxis(localScale.y, worldScaleBefore.y, worldScaleAfter.y),
+			RescaleAxis(localScale.z, worldScaleBefore.z, worldScaleAfter.z));
+
+		if (LogEnabled)
+		{
+			Debug.LogWarning(
+				$"[GripperController] El punto de agarre deformaba {target.name} " +
+				$"({worldScaleBefore} -> {worldScaleAfter}); se corrigió la escala. " +
+				"Conviene revisar la escala del graspPoint en la jerarquía.");
+		}
+	}
+
+	private static float RescaleAxis(float localScale, float worldBefore, float worldAfter)
+	{
+		return Mathf.Approximately(worldAfter, 0f) ? localScale : localScale * (worldBefore / worldAfter);
+	}
+
+	private static bool IsApproximately(Vector3 a, Vector3 b)
+	{
+		return Mathf.Approximately(a.x, b.x) && Mathf.Approximately(a.y, b.y) && Mathf.Approximately(a.z, b.z);
+	}
+
+	/// <summary>
+	/// Velocidad del punto de agarre, estimada por diferencia de posición entre ticks de física. Se
+	/// mide siempre, haya pieza o no, para que al soltar el valor ya esté disponible.
+	/// </summary>
+	private void TrackGraspVelocity()
+	{
+		Transform anchor = graspPoint != null ? graspPoint : transform;
+		Vector3 position = anchor.position;
+
+		if (hasLastGraspPosition && Time.fixedDeltaTime > 0f)
+		{
+			graspVelocity = (position - lastGraspPosition) / Time.fixedDeltaTime;
+		}
+
+		lastGraspPosition = position;
+		hasLastGraspPosition = true;
 	}
 
 	private void MoveGrabbedObjectToSafeReleaseHeight()
@@ -401,6 +548,8 @@ public class GripperController : MonoBehaviour
 
 	private void FixedUpdate()
 	{
+		// Antes de la suelta: al liberar la pieza se le transfiere esta velocidad.
+		TrackGraspVelocity();
 		UpdatePendingRelease();
 
 		if (!isClosing || gripperAnimator == null) return;
@@ -416,5 +565,6 @@ public class GripperController : MonoBehaviour
 		releaseClearance = Mathf.Max(0f, releaseClearance);
 		releaseOpeningDelta = Mathf.Clamp01(releaseOpeningDelta);
 		releaseTimeout = Mathf.Max(0.05f, releaseTimeout);
+		maxInheritedReleaseSpeed = Mathf.Max(0f, maxInheritedReleaseSpeed);
 	}
 }

@@ -23,7 +23,6 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private Button proximityThresholdButton;
     [SerializeField] private Button descentMarginButton;
     [SerializeField] private Button guideLengthButton;
-    [SerializeField] private Button debugModeButton;
     [SerializeField] private JoystickAdapter joystickAdapter;
 
     [Header("Menu Colors")]
@@ -125,66 +124,6 @@ public class PauseMenuController : MonoBehaviour
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// El menu de pausa se arma de dos maneras distintas segun la escena: si <c>pauseMenuRoot</c> esta
-    /// asignado, el panel ya existe en el .unity y hay que inyectar el boton nuevo; si no, lo crea
-    /// <see cref="BuildDefaultMenu"/>. Este Ensure cubre el primer caso, para que el boton aparezca sin
-    /// tener que editar la jerarquia de la escena a mano.
-    /// </summary>
-    private void EnsureDebugModeButtonExists()
-    {
-        if (debugModeButton != null) return;
-
-        Transform panel = pauseMenuRoot.transform.Find("Panel");
-        if (panel == null)
-        {
-            panel = pauseMenuRoot.GetComponentInChildren<VerticalLayoutGroup>()?.transform;
-        }
-
-        if (panel != null)
-        {
-            Transform existing = panel.Find("DebugModeButton");
-            if (existing != null)
-            {
-                debugModeButton = existing.GetComponent<Button>();
-            }
-            else
-            {
-                debugModeButton = CreateButton(BuildDebugModeLabel(), panel);
-                debugModeButton.gameObject.name = "DebugModeButton";
-
-                if (continueButton != null)
-                {
-                    debugModeButton.transform.SetSiblingIndex(continueButton.transform.GetSiblingIndex());
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Enciende o apaga los logs de diagnostico en caliente (agarre, contactos de los dedos y
-    /// recuperacion de piezas caidas). Los flags del Inspector siguen actuando como override local.
-    /// </summary>
-    public void ToggleDebugMode()
-    {
-        DebugSettings.Toggle();
-        UpdateDebugModeButtonText();
-    }
-
-    private void UpdateDebugModeButtonText()
-    {
-        if (debugModeButton == null) return;
-
-        var text = debugModeButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (text != null)
-            text.text = BuildDebugModeLabel();
-    }
-
-    private static string BuildDebugModeLabel()
-    {
-        return $"Modo debug: {DebugSettings.Describe()}";
     }
 
     /// <summary>
@@ -303,7 +242,6 @@ public class PauseMenuController : MonoBehaviour
         {
             EnsureOrientationButtonExists();
             EnsureProximityThresholdButtonExists();
-            EnsureDebugModeButtonExists();
         }
 
         WireButtons();
@@ -591,9 +529,6 @@ public class PauseMenuController : MonoBehaviour
 
         if (guideLengthButton != null)
             guideLengthButton.onClick.AddListener(CycleGuideLength);
-
-        if (debugModeButton != null)
-            debugModeButton.onClick.AddListener(ToggleDebugMode);
     }
 
     private void OnActiveProfileChanged(InputProfileSwitcher.InputProfileKind profile)
@@ -646,7 +581,6 @@ public class PauseMenuController : MonoBehaviour
         UpdateProximityThresholdButtonText();
         UpdateDescentMarginButtonText();
         UpdateGuideLengthButtonText();
-        UpdateDebugModeButtonText();
 
         if (EventSystem.current != null)
         {
@@ -746,7 +680,6 @@ public class PauseMenuController : MonoBehaviour
             proximityThresholdButton,
             descentMarginButton,
             guideLengthButton,
-            debugModeButton,
             continueButton
         };
 
@@ -909,10 +842,9 @@ public class PauseMenuController : MonoBehaviour
         panelRect.anchorMax = new Vector2(0.5f, 0.5f);
         panelRect.pivot = new Vector2(0.5f, 0.5f);
         panelRect.anchoredPosition = Vector2.zero;
-        // 798 (y no 560) para que entren los tres botones de asistencia (frenado, bloqueo de
-        // descenso y guías) y el de modo debug sin recortar 'Continuar'. Cada botón suma 46 de
-        // alto + 12 de spacing del VerticalLayoutGroup.
-        panelRect.sizeDelta = new Vector2(460f, 798f);
+        // 740 (y no 560) para que entren los tres botones de asistencia (frenado, bloqueo de
+        // descenso y guías) sin recortar 'Continuar'.
+        panelRect.sizeDelta = new Vector2(460f, 740f);
 
         var panelImage = panel.AddComponent<Image>();
         panelImage.color = panelColor;
@@ -971,9 +903,6 @@ public class PauseMenuController : MonoBehaviour
 
         guideLengthButton = CreateButton(BuildGuideLengthLabel(), panel.transform);
         guideLengthButton.gameObject.name = "GuideLengthButton";
-
-        debugModeButton = CreateButton(BuildDebugModeLabel(), panel.transform);
-        debugModeButton.gameObject.name = "DebugModeButton";
 
         continueButton = CreateButton("Continuar", panel.transform);
     }
@@ -1038,7 +967,6 @@ public class PauseMenuController : MonoBehaviour
         ApplyButtonColors(proximityThresholdButton);
         ApplyButtonColors(descentMarginButton);
         ApplyButtonColors(guideLengthButton);
-        ApplyButtonColors(debugModeButton);
         RefreshSelectedTextColors();
     }
 
@@ -1075,7 +1003,6 @@ public class PauseMenuController : MonoBehaviour
         SetButtonTextColor(proximityThresholdButton, selected);
         SetButtonTextColor(descentMarginButton, selected);
         SetButtonTextColor(guideLengthButton, selected);
-        SetButtonTextColor(debugModeButton, selected);
     }
 
     private void SetButtonTextColor(Button button, GameObject selected)

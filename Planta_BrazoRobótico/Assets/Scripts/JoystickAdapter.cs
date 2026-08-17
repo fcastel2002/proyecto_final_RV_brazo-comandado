@@ -114,6 +114,19 @@ public class JoystickAdapter : MonoBehaviour
     [SerializeField, Min(0f)] private float _collisionClearance = 0.02f;
     [Tooltip("Se ignoran las superficies cuya normal apunte hacia arriba más que este valor (suelos, tapas de palés): el descenso lo gobierna el bloqueo del gripper cerrado, y vetarlo aquí impediría bajar a recoger piezas.")]
     [SerializeField, Range(0f, 1f)] private float _floorNormalThreshold = 0.7f;
+    [Tooltip("Añade un segundo barrido con el volumen de la pieza agarrada. Sin esto solo se vigila el gripper y la pieza puede empotrarse lateralmente contra el entorno.")]
+    [SerializeField] private bool _includePayloadInCollisionVeto = true;
+
+    [Header("Piso duro")]
+    [Tooltip("Límite de altura puramente geométrico: no depende de que el suelo tenga colliders ni de que el sensor detecte algo. Es la única protección que sigue actuando con el entorno sin preparar.")]
+    [SerializeField] private bool _enableHardFloor = true;
+    [Tooltip("Altura mundial (m) de la superficie del suelo. Debe coincidir con el 'minimumWorldY' de GrabbableSafetyGuard y el 'minimumReleaseWorldY' de GripperController.")]
+    [SerializeField] private float _hardFloorWorldY = 0f;
+    [Tooltip("Holgura (m) que se deja sobre el suelo.")]
+    [SerializeField, Min(0f)] private float _hardFloorClearance = 0.005f;
+
+    /// <summary>Altura mundial por debajo de la cual no se permite bajar. Solo lectura, para diagnóstico.</summary>
+    public float HardFloorWorldY => _hardFloorWorldY;
 
     /// <summary>true si el avance está siendo recortado por un obstáculo del entorno.</summary>
     public bool IsMotionBlocked { get; private set; }
@@ -280,20 +293,72 @@ public class JoystickAdapter : MonoBehaviour
     /// la componente vertical del input se compone como Vector3.up * rawY, también en mundo.
     /// El paso se recorta al margen restante en vez de cortarse en seco, para que el brazo se detenga
     /// justo sobre el margen en lugar de pasarse un tick.
+    ///
+    /// El margen NO es el mismo con la garra vacía que transportando una pieza. Vacía, protege al
+    /// gripper de estrellarse contra el suelo y conviene que sea holgado. Con una pieza agarrada la
+    /// maniobra es la contraria —hay que apoyarla— y el sensor ya descuenta cuánto sobresale la pieza,
+    /// así que el hueco útil tiene que poder llegar casi a cero: con el margen holgado, depositar era
+    /// imposible porque el brazo se frenaba con la pieza a 5 cm de la superficie.
     /// </summary>
     private void ApplyDescentLimit(ref Vector3 deltaWorld)
     {
         IsDescentBlocked = false;
 
         if (deltaWorld.y >= 0f) return;
-        if (!ProximitySlowdownSettings.IsDescentBlockEnabled) return;
         if (_gripperController == null || !_gripperController.IsGripperClosed) return;
         if (_proximitySensor == null || !_proximitySensor.HasHit) return;
 
+        bool isCarryingPayload = _gripperController.IsHoldingObject;
+        if (!ProximitySlowdownSettings.IsDescentBlockEnabledFor(isCarryingPayload)) return;
+
         float allowedDescent = Mathf.Max(
             0f,
-            _proximitySensor.Distance - ProximitySlowdownSettings.DescentMarginMeters);
+            _proximitySensor.Distance - ProximitySlowdownSettings.GetDescentMargin(isCarryingPayload));
 
+        if (deltaWorld.y >= -allowedDescent) return;
+
+        deltaWorld.y = -allowedDescent;
+        IsDescentBlocked = true;
+    }
+
+    /// <summary>
+    /// Piso duro: impide que el gripper —o la pieza que lleve— baje por debajo de una cota mundial.
+    ///
+    /// A diferencia del bloqueo de descenso y del veto de colisión, que son **reactivos** (necesitan que
+    /// el sensor detecte algo y que el obstáculo tenga collider), este límite es puramente geométrico y
+    /// no depende del entorno. Existe porque los prefabs del entorno vienen sin colliders: mientras no se
+    /// ejecute `Tools > Entorno > Generar colliders faltantes`, el suelo no existe para las queries de
+    /// física, ninguno de los otros dos mecanismos puede actuar y el brazo lo atraviesa. El clamp de
+    /// workspace tampoco lo evita: su `_minHeight` está en el frame del robot, no en mundo, y permite
+    /// bajar por debajo del suelo.
+    ///
+    /// Se mide sobre los AABB reales del gripper y de la pieza, así que no hay offsets que calibrar.
+    /// </summary>
+    private void ApplyHardFloorLimit(ref Vector3 deltaWorld)
+    {
+        if (!_enableHardFloor) return;
+        if (deltaWorld.y >= 0f) return;
+
+        float lowestY = float.MaxValue;
+
+        if (_gripperController != null)
+        {
+            if (_gripperController.TryGetGripperBounds(out Bounds gripperBounds))
+                lowestY = gripperBounds.min.y;
+
+            if (_gripperController.TryGetPayloadBounds(out Bounds payloadBounds))
+                lowestY = Mathf.Min(lowestY, payloadBounds.min.y);
+        }
+
+        // Sin colliders donde medir, el TCP es la mejor referencia disponible. Queda conservador:
+        // la punta de los dedos está por debajo del TCP.
+        if (lowestY == float.MaxValue)
+        {
+            if (_endEffector == null) return;
+            lowestY = _endEffector.position.y;
+        }
+
+        float allowedDescent = Mathf.Max(0f, lowestY - (_hardFloorWorldY + _hardFloorClearance));
         if (deltaWorld.y >= -allowedDescent) return;
 
         deltaWorld.y = -allowedDescent;
@@ -330,7 +395,49 @@ public class JoystickAdapter : MonoBehaviour
             _obstacleMask,
             QueryTriggerInteraction.Ignore);
 
+        float nearest = NearestObstacleDistance(hitCount);
+
+        // La pieza agarrada cuelga del robot, así que IsObstacle la descarta, y el barrido de arriba
+        // solo representa el volumen del gripper: sin este segundo barrido se la puede empotrar
+        // lateralmente contra el entorno. Se usa un BoxCast con su AABB real en vez de inflar el radio
+        // de la esfera, que penalizaría también al gripper vacío.
+        if (_includePayloadInCollisionVeto &&
+            _gripperController != null &&
+            _gripperController.TryGetPayloadBounds(out Bounds payloadBounds))
+        {
+            int payloadHitCount = Physics.BoxCastNonAlloc(
+                payloadBounds.center,
+                payloadBounds.extents,
+                direction,
+                _collisionBuffer,
+                Quaternion.identity,
+                castDistance,
+                _obstacleMask,
+                QueryTriggerInteraction.Ignore);
+
+            float payloadNearest = NearestObstacleDistance(payloadHitCount);
+            if (payloadNearest < nearest)
+                nearest = payloadNearest;
+        }
+
+        if (nearest == float.MaxValue) return;
+
+        float allowedStep = Mathf.Max(0f, nearest - _collisionClearance);
+        if (allowedStep >= stepDistance) return;
+
+        deltaWorld = direction * allowedStep;
+        IsMotionBlocked = true;
+    }
+
+    /// <summary>
+    /// Distancia al obstáculo más cercano de los impactos que quedaron en <see cref="_collisionBuffer"/>,
+    /// o <c>float.MaxValue</c> si ninguno cuenta. Se comparte entre el barrido del gripper y el de la
+    /// pieza agarrada para que ambos apliquen exactamente los mismos descartes.
+    /// </summary>
+    private float NearestObstacleDistance(int hitCount)
+    {
         float nearest = float.MaxValue;
+
         for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
         {
             RaycastHit hit = _collisionBuffer[hitIndex];
@@ -349,13 +456,7 @@ public class JoystickAdapter : MonoBehaviour
                 nearest = hit.distance;
         }
 
-        if (nearest == float.MaxValue) return;
-
-        float allowedStep = Mathf.Max(0f, nearest - _collisionClearance);
-        if (allowedStep >= stepDistance) return;
-
-        deltaWorld = direction * allowedStep;
-        IsMotionBlocked = true;
+        return nearest;
     }
 
     /// <summary>
@@ -782,6 +883,9 @@ public class JoystickAdapter : MonoBehaviour
         var deltaWorld = _velocity * (_speed * dt * driftSpeedMultiplier * payloadSpeedMultiplier * proximitySpeedMultiplier);
 
         ApplyDescentLimit(ref deltaWorld);
+        // Después del bloqueo de descenso, que resetea IsDescentBlocked al entrar: así el aviso del
+        // HUD sobrevive cuando quien frena es el piso duro.
+        ApplyHardFloorLimit(ref deltaWorld);
         ApplyCollisionVeto(ref deltaWorld);
 
         var deltaFrame = WorldVectorToFrame(deltaWorld, frame, extJoint);
@@ -1068,9 +1172,11 @@ public class JoystickAdapter : MonoBehaviour
                         
                         // Limitar deltaStick para robustez extrema (evita fallos al cruzar la zona muerta)
                         deltaStick = Mathf.Clamp(deltaStick, -90f, 90f);
-                        
-                        // Gear ratio 1:4 e inversión del giro (negativo)
-                        float targetDelta = -deltaStick * 0.25f;
+
+                        // Gear ratio 1:4. El giro sigue al stick: girarlo en horario mueve J6 en
+                        // horario. Antes iba negado, y ademas quedaba al reves que los botones
+                        // L1/R1 de arriba, que nunca estuvieron invertidos.
+                        float targetDelta = deltaStick * 0.25f;
                         _j6TargetAngle += targetDelta;
                     }
                     

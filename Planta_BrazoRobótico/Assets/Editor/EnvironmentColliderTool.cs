@@ -66,6 +66,112 @@ public static class EnvironmentColliderTool
         Debug.Log($"[EnvironmentColliderTool] {added} MeshCollider anadidos, {relayered} objetos movidos a la layer 'Entorno', {skipped} omitidos (robot, gripper, piezas agarrables o UI). Reversible con Ctrl+Z.");
     }
 
+    /// <summary>
+    /// Responde por que el brazo atraviesa o no atraviesa el entorno, con numeros en vez de suposiciones.
+    ///
+    /// Los tres fallos que se han dado en la practica y que este informe detecta de un vistazo:
+    /// ejecutar la herramienta con Map_v2 sin cargar (el entorno vive ahi, no en Planta), que la
+    /// mascara del veto no cubra la layer Entorno, y que la del sensor tampoco, con lo que el bloqueo
+    /// de descenso no ve las superficies elevadas.
+    /// </summary>
+    [MenuItem("Tools/Entorno/Diagnosticar anticolision")]
+    public static void DiagnoseCollisionSetup()
+    {
+        var report = new System.Text.StringBuilder();
+        report.AppendLine("[EnvironmentColliderTool] Diagnostico de anticolision");
+
+        report.AppendLine($"\nEscenas cargadas ({SceneManager.sceneCount}):");
+        List<Transform> skipRoots = CollectRootsToSkip();
+        int totalEnvironmentColliders = 0;
+
+        for (int sceneIndex = 0; sceneIndex < SceneManager.sceneCount; sceneIndex++)
+        {
+            Scene scene = SceneManager.GetSceneAt(sceneIndex);
+            if (!scene.isLoaded)
+            {
+                report.AppendLine($"  - {scene.name}: NO CARGADA");
+                continue;
+            }
+
+            int meshes = 0;
+            int withCollider = 0;
+            int inEnvironmentLayer = 0;
+
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                foreach (MeshFilter meshFilter in root.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    GameObject target = meshFilter.gameObject;
+                    if (ShouldSkip(target, skipRoots)) continue;
+
+                    meshes++;
+                    if (target.GetComponent<Collider>() != null) withCollider++;
+                    if (target.layer == EnvironmentLayer) inEnvironmentLayer++;
+                }
+            }
+
+            totalEnvironmentColliders += inEnvironmentLayer;
+            report.AppendLine(
+                $"  - {scene.name}: {meshes} mallas candidatas, {withCollider} con collider, " +
+                $"{inEnvironmentLayer} en layer 'Entorno'.");
+        }
+
+        if (totalEnvironmentColliders == 0)
+        {
+            report.AppendLine(
+                "  >> NADA en la layer 'Entorno'. Si la escena del entorno (Map_v2) no aparece arriba " +
+                "como cargada, ese es el motivo: hay que cargarla ANTES de generar los colliders.");
+        }
+
+        JoystickAdapter adapter = Object.FindFirstObjectByType<JoystickAdapter>(FindObjectsInactive.Include);
+        report.AppendLine("\nVeto de colision (JoystickAdapter):");
+        if (adapter == null)
+        {
+            report.AppendLine("  - No se encontro ningun JoystickAdapter en escena.");
+        }
+        else
+        {
+            var serialized = new SerializedObject(adapter);
+            int mask = serialized.FindProperty("_obstacleMask").intValue;
+            bool coversEnvironment = (mask & (1 << EnvironmentLayer)) != 0;
+
+            report.AppendLine($"  - _enableCollisionVeto: {serialized.FindProperty("_enableCollisionVeto").boolValue}");
+            report.AppendLine($"  - _obstacleMask: {mask} -> cubre layer 'Entorno': {(coversEnvironment ? "SI" : "NO")}");
+            report.AppendLine($"  - _endEffector: {(serialized.FindProperty("_endEffector").objectReferenceValue != null ? "asignado" : "SIN ASIGNAR (el veto no actua)")}");
+            report.AppendLine($"  - _enableHardFloor: {serialized.FindProperty("_enableHardFloor").boolValue}, cota Y = {serialized.FindProperty("_hardFloorWorldY").floatValue}");
+        }
+
+        report.AppendLine("\nSensor que gobierna el bloqueo de descenso:");
+        GripperDistanceSensor speedSensor = null;
+        foreach (var sensor in Object.FindObjectsByType<GripperDistanceSensor>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (new SerializedObject(sensor).FindProperty("contributesToSpeedReduction").boolValue)
+            {
+                speedSensor = sensor;
+                break;
+            }
+        }
+
+        if (speedSensor == null)
+        {
+            report.AppendLine("  - Ningun sensor tiene 'contributesToSpeedReduction'. El bloqueo de descenso no actua.");
+        }
+        else
+        {
+            var serialized = new SerializedObject(speedSensor);
+            int mask = serialized.FindProperty("detectionMask").intValue;
+            report.AppendLine($"  - {speedSensor.name}: detectionMask {mask} -> cubre 'Entorno': {((mask & (1 << EnvironmentLayer)) != 0 ? "SI" : "NO")}, maxDistance {serialized.FindProperty("maxDistance").floatValue} m");
+        }
+
+        report.AppendLine(
+            "\nLimites por diseno (no son fallos): el veto solo vigila el GRIPPER y la pieza que lleve, " +
+            "no los eslabones del brazo (codo, antebrazo), que no tienen colliders. Y descarta las " +
+            "superficies horizontales: mesas y palés los gobierna el bloqueo de descenso via sensor, " +
+            "no el veto.");
+
+        Debug.Log(report.ToString());
+    }
+
     [MenuItem("Tools/Entorno/Quitar colliders generados")]
     public static void RemoveGeneratedColliders()
     {

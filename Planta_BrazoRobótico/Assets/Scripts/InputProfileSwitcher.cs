@@ -271,8 +271,15 @@ public class InputProfileSwitcher : MonoBehaviour
                 MoveY = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Y"),
                 MoveZ = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Z"),
                 CameraToggle = Resolve(robotBasicAsset, "Basico Cartesiano", "Camera Toggle"),
-                MoveForward = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover X"),
-                MoveSide = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Z"),
+                // Estos tres son el mapeo del MODO CAMARA y solo se aplican ahi: el
+                // CameraJoystickController sale por IsCameraMode. En modo robot los mismos ejes siguen
+                // moviendo el TCP como siempre, con los roles de MoveX/MoveY/MoveZ de arriba.
+                MoveForward = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Z"),
+                MoveSide = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover X"),
+                // El VR2 no tiene segundo stick, asi que ViewSide (el yaw, que en PS4 hace el stick
+                // derecho) se quedaba sin asignar y no se podia girar la vista. Se le da "Mover Y",
+                // el unico de los tres ejes que el modo camara no usaba.
+                ViewSide = Resolve(robotBasicAsset, "Basico Cartesiano", "Mover Y"),
                 Gripper = Resolve(robotBasicAsset, "Basico Cartesiano", "Gripper"),
                 J6AntiHor = null,
                 J6Hor = null,

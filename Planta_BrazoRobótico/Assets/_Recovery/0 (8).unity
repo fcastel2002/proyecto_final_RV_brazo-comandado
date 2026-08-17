@@ -1226,9 +1226,7 @@ MonoBehaviour:
   orientationModeButton: {fileID: 0}
   proximityThresholdButton: {fileID: 0}
   descentMarginButton: {fileID: 0}
-  carryDescentMarginButton: {fileID: 0}
   guideLengthButton: {fileID: 0}
-  debugModeButton: {fileID: 0}
   joystickAdapter: {fileID: 0}
   overlayColor: {r: 0, g: 0, b: 0, a: 0.55}
   panelColor: {r: 0.08, g: 0.09, b: 0.11, a: 0.96}
@@ -2737,7 +2735,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7e91b0d34c6a4f28a5d3f0b19c72e6d5, type: 2}
+  - {fileID: 2100000, guid: 0bd98b08aecd8cd4eb56aa3f32e5dba9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3386,7 +3384,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7e91b0d34c6a4f28a5d3f0b19c72e6d5, type: 2}
+  - {fileID: 2100000, guid: 0bd98b08aecd8cd4eb56aa3f32e5dba9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -4229,7 +4227,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7e91b0d34c6a4f28a5d3f0b19c72e6d5, type: 2}
+  - {fileID: 2100000, guid: 0bd98b08aecd8cd4eb56aa3f32e5dba9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -6079,14 +6077,14 @@ MonoBehaviour:
   _j6AntiHorAction: {fileID: 0}
   _j6HorAction: {fileID: 0}
   _j6HomeAction: {fileID: 0}
-  _invertMoveX: 1
+  _invertMoveX: 0
   _invertMoveY: 0
-  _invertMoveZ: 0
+  _invertMoveZ: 1
   _calibrationManager: {fileID: 317623021}
   _modoCamara: {fileID: -4946550936969249809, guid: fdc0e5ccf192310489d6f53746984f2f, type: 3}
   _cameraModeAllowed: 1
   _endEffector: {fileID: 1721627814}
-  _speed: 1.99
+  _speed: 1
   _pidActionsPanel: {fileID: 9902641}
   _kpBase: 10.8
   _kiBase: 5.03
@@ -6094,7 +6092,7 @@ MonoBehaviour:
   _referenceInertia: 5.39
   _velocityDamping: 1
   _maxJointVelocity: 60
-  _maxJointAcceleration: 720
+  _maxJointAcceleration: 200
   _gripperController: {fileID: 0}
   _payloadInertiaMultiplier: 5.14
   _maxSimulatedPayloadMass: 20
