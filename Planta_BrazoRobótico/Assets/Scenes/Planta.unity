@@ -1226,9 +1226,7 @@ MonoBehaviour:
   orientationModeButton: {fileID: 0}
   proximityThresholdButton: {fileID: 0}
   descentMarginButton: {fileID: 0}
-  carryDescentMarginButton: {fileID: 0}
   guideLengthButton: {fileID: 0}
-  debugModeButton: {fileID: 0}
   joystickAdapter: {fileID: 0}
   overlayColor: {r: 0, g: 0, b: 0, a: 0.55}
   panelColor: {r: 0.08, g: 0.09, b: 0.11, a: 0.96}
@@ -2737,7 +2735,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7e91b0d34c6a4f28a5d3f0b19c72e6d5, type: 2}
+  - {fileID: 2100000, guid: 6b0c7f42d81a4e35b9f2a6d0c37e8514, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -2768,7 +2766,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 791994877}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: fcddc27f27da19145b8037c066f61b84, type: 2}
 --- !u!4 &791994882
 Transform:
   m_ObjectHideFlags: 0
@@ -3386,7 +3384,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7e91b0d34c6a4f28a5d3f0b19c72e6d5, type: 2}
+  - {fileID: 2100000, guid: 6b0c7f42d81a4e35b9f2a6d0c37e8514, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -3417,7 +3415,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 883498306}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: fcddc27f27da19145b8037c066f61b84, type: 2}
 --- !u!4 &883498311
 Transform:
   m_ObjectHideFlags: 0
@@ -4229,7 +4227,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7e91b0d34c6a4f28a5d3f0b19c72e6d5, type: 2}
+  - {fileID: 2100000, guid: 6b0c7f42d81a4e35b9f2a6d0c37e8514, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -4260,7 +4258,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1309936820}
-  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 4300000, guid: fcddc27f27da19145b8037c066f61b84, type: 2}
 --- !u!4 &1309936825
 Transform:
   m_ObjectHideFlags: 0
