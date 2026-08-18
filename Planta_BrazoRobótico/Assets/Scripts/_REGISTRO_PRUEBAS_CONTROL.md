@@ -1122,3 +1122,67 @@ Resultado observado:
 
 Leccion:
 - **Un guard "hasta soltar" que mira el nivel de varias fuentes a la vez es un punto unico de fallo.** Si cualquiera de ellas puede quedarse en alto, bloquea la interaccion entera y el sintoma aparece lejos de la causa. Con deteccion por flanco disponible, el guard de nivel sobra o debe llevar tope temporal.
+
+---
+
+### 2026-08-02 (11) - Sección de Métricas de Desempeño (Canvas) + contador de colisiones del gripper
+
+Sintoma / pedido:
+- Enriquecer el proyecto (aplicación de colocación de celdas Eternity en racks de autoelevadores) con métricas de desempeño visibles en el Canvas: cantidad de colisiones del gripper contra objetos no agarrables, tiempo de operación (agarre→suelta), cantidad de operaciones (objetos movidos) y masa del objeto agarrado. Debía seguir el mismo patrón estático de Hierarchy que `PID_Section`/`Guide_Section` (sin generar objetos por código salvo extensión futura vía plantilla).
+
+Cambio probado:
+- Nuevo `Assets/Scripts/PerformanceMetricsPanel.cs`: panel estático (mismo patrón que `PidActionsPanel`/`ControlGuidePanel`) con 4 filas fijas + `SetExtraRow` para métricas futuras clonando una plantilla inactiva.
+- Nuevo `Assets/Scripts/PerformanceMetricsTracker.cs`: en `OnRobot_RG2`, junto a `GripperController` (sin modificarlo). Detecta la transición agarre→suelta por polling de `IsHoldingObject`/`GrabbedMass` en `Update()` (no se agregaron eventos a `GripperController` para minimizar el cambio en un script del gripper), cuenta operaciones, mide duración, y expone `NotifyCollisionContact` para el conteo de colisiones, deduplicado por objeto (si dos partes del gripper tocan la misma pieza a la vez, cuenta una sola colisión).
+- Nuevo `Assets/Scripts/GripperCollisionCounter.cs`: mismo mecanismo que `GripperTriggerForwarder` (triggers, no colisión sólida) aplicado al caso inverso: cuenta contacto solo si el objeto **no** tiene tag "Agarrable", e ignora contactos bajo un `Transform` raíz configurable (el propio robot) para no contarse a sí mismo.
+- Se decidió explícitamente **no** usar `OnCollisionEnter`: el Rigidbody del gripper es Kinematic (confirmado en la escena) y Unity no garantiza eventos de colisión sólida entre un Rigidbody Kinematic y colliders estáticos sin Rigidbody (paredes, racks). Los triggers sí son confiables en esa combinación, y es el mismo mecanismo que ya usa el agarre.
+- Hierarchy: `Metrics_Section` creado a mano como hijo de `InfoPanel_Gripper` (mismo patrón Vertical Layout Group + Content Size Fitter que `PID_Section`/`Guide_Section`), con título + 4 filas + plantilla inactiva. `CollisionSensor` creado a mano como hijo de `OnRobot_RG2`, con `BoxCollider` en modo Trigger.
+
+Archivos/parametros:
+- `Assets/Scripts/PerformanceMetricsPanel.cs` (nuevo)
+- `Assets/Scripts/PerformanceMetricsTracker.cs` (nuevo)
+- `Assets/Scripts/GripperCollisionCounter.cs` (nuevo)
+- `Assets/Scenes/Planta.unity`: `Metrics_Section` (nuevo, hijo de `InfoPanel_Gripper`), `CollisionSensor` (nuevo, hijo de `OnRobot_RG2`).
+
+Resultado observado:
+- Feedback del usuario en Play Mode: "Impecable" — agarrar y soltar una celda de batería (tag "Agarrable") no suma colisión; tocar el rack, la caja u otro objeto sin ese tag sí suma. El panel se ve correctamente integrado en el mismo recuadro que PID/Guía/Cámara.
+
+Nota sobre el `BoxCollider` de `CollisionSensor`:
+- Al colgar de la base fija del gripper (`OnRobot_RG2`) y no de los huesos de los dedos (`L_Arm_ID_0/1`, `R_Arm_ID_0/1`), su tamaño **no seguí la apertura/cierre real** de la garra. Se dimensionó a mano para el caso "dedos abiertos" (peor caso), lo que puede sobre-contar alguna colisión cuando la garra está cerrada y el volumen del sensor sobresale más allá de los dedos reales en ese instante. Aceptado como trade-off correcto para esta métrica (mejor sobre-contar que no detectar). Mejora futura posible, no implementada: redimensionar el collider en cada `FixedUpdate` usando `GripperController.TryGetGripperBounds()`, que ya calcula el AABB real de los colliders del gripper cuadro a cuadro.
+
+Decision:
+- Integrar permanentemente. Nota de compatibilidad con arquitectura de control: cambio exclusivamente de UI/telemetría del gripper; no se tocó `JoystickAdapter`, `JointPID`, `RobotDynamics`, la generación del target IK, ni `GripperController`/`GripperTriggerForwarder` (se leen, no se modifican).
+
+---
+
+### 2026-08-17 (12) - Investigación: el gripper atraviesa todos los objetos salvo el piso
+
+Sintoma:
+- El usuario pidió analizar por qué puede atravesar todo el entorno con el gripper, salvo el piso, y si se puede arreglar para que no atraviese nada.
+
+Diagnóstico (sin cambios de código, solo lectura + herramientas ya existentes en el proyecto):
+- El piso funciona distinto: lo protegen `ApplyHardFloorLimit()` (cota Y numérica fija) y `ApplyDescentLimit()` (sensor de proximidad), **ninguno de los dos necesita colliders**. Existen justamente porque no se podía confiar en la colisión real del entorno (ver nota ya existente en `_ARQUITECTURA_CONTROL.md`, "Piso duro").
+- Para el resto del entorno **ya existe** un veto genérico (`ApplyCollisionVeto()`, `SphereCast`/`BoxCast` contra `_obstacleMask` = layer "Entorno"), activado (`_enableCollisionVeto: True`) y con la máscara correcta.
+- `Tools > Entorno > Diagnosticar anticolision` (herramienta ya existente, `Assets/Editor/EnvironmentColliderTool.cs`) confirmó en dos corridas sucesivas:
+  1. Primera corrida: `Planta: 2 mallas candidatas, 2 con collider, 0 en layer 'Entorno'` — `Rack` y `Caja` tenían colliders pero estaban en layer `Default` en vez de `Entorno`. `Map_v2` ya estaba 100% correcto (173/173).
+  2. Se corrió `Tools > Entorno > Generar colliders faltantes` (con `Planta` + `Map_v2` cargadas) → `Rack`/`Caja` pasaron a layer `Entorno`. Segunda corrida del diagnóstico: `Planta: 2/2/2`. **El brazo seguía atravesando todo** pese a la configuración ya correcta.
+- Inspección directa de los 5 `BoxCollider` de `Rack`: formaban un **marco hueco** (4 paredes finas de 0.045 en el perímetro + una bandeja delgada cerca del piso), pensado para la estructura del rack, no para los bidones apilados dentro/sobre él. El interior (donde están los bidones) no tenía collider.
+- Se agregó un `MeshCollider` no-convexo sobre `Rack` usando su malla real (`SM_RackEternity`, la misma del `Mesh Renderer`), replicando el patrón que ya usa `EnvironmentColliderTool` para el resto del entorno. **Seguía siendo atravesable.**
+- Dato del usuario, empírico: agregarle un `Rigidbody` (no-kinemático) a `Rack` sí lo vuelve detectable — pero ahora el robot puede empujarlo/chocarlo físicamente.
+
+Causa raíz identificada:
+- `Physics.SphereCastNonAlloc`/`BoxCastNonAlloc` (las queries de `ApplyCollisionVeto`) no detectan de forma confiable un `MeshCollider` no-convexo si el objeto no tiene `Rigidbody` — limitación de PhysX, no un bug del script. `Physics.Raycast` sí funciona sin Rigidbody; las queries de barrido de forma (sphere/box cast) no.
+- El Rigidbody agregado empíricamente por el usuario es no-kinemático, por eso el gripper (Kinematic) lo empuja: un Rigidbody Kinematic siempre puede mover a uno dinámico que toca, nunca al revés.
+
+Cambio propuesto (pendiente de que el usuario lo pruebe — se priorizó actualizar la documentación antes de seguir probando en Play Mode):
+- Mantener el `Rigidbody` en `Rack`, pero marcar **`Is Kinematic = true`**. Debería preservar la detección (por tener Rigidbody) sin el empuje físico (por ser Kinematic, no reacciona a fuerzas ni colisiones).
+- Si funciona, replicar en `Caja`: `Mesh Collider` no-convexo sobre su malla real + `Rigidbody` Kinematic.
+
+Archivos/parametros:
+- `Assets/Scenes/Planta.unity`: `Rack` — layer reasignada a `Entorno` (vía herramienta), `Mesh Collider` agregado (no-convexo, mesh `SM_RackEternity`), `Rigidbody` agregado (no-kinemático, pendiente de pasar a Kinematic). Ningún script tocado.
+- Documentado en `_ARQUITECTURA_CONTROL.md`, sección "Anticolision con el entorno": nota sobre el requisito de Rigidbody (Kinematic) para que las queries de barrido detecten `MeshCollider` no-convexos, y aceptación explícita de que el veto solo vigila gripper + pieza agarrada (no codo/antebrazo), justificada por la cinemática DH de este robot (eje `q3` perpendicular al plano brazo-antebrazo) y la ausencia de obstáculos que sobresalgan de ese plano en la escena actual.
+
+Resultado observado:
+- **Pendiente de confirmar en Play Mode** si `Rigidbody` + `Is Kinematic` en `Rack` da detección sin empuje. `Caja` queda pendiente de replicar el mismo tratamiento una vez confirmado.
+
+Decision:
+- No integrar todavía como definitivo — falta la confirmación del paso Kinematic. Documentado para que la investigación (y el motivo de cada paso) quede trazable de una sesión a la otra.

@@ -481,7 +481,24 @@ Reglas de diseno:
   cuando el entorno esta preparado, no antes.
 - **Alcance conocido**: se vigilan el volumen del gripper y el de la pieza agarrada. Los eslabones altos
   del brazo (codo, antebrazo) pueden seguir atravesando geometria, porque no tienen colliders y vigilarlos
-  exigiria un barrido por eslabon. Queda fuera de este mecanismo.
+  exigiria un barrido por eslabon. Queda fuera de este mecanismo. **Aceptado como limite de diseno**: por
+  la cinematica DH de este robot (eje de `q3` horizontal y perpendicular al plano brazo-antebrazo), esos
+  eslabones quedan contenidos dentro del plano vertical del brazo, y no hay geometria en el entorno actual
+  que los golpee sin golpear antes al gripper. Si se agregan obstaculos que sobresalgan de ese plano, esta
+  suposicion deja de valer.
+
+> [!IMPORTANT]
+> **Un `MeshCollider` no-convexo necesita un `Rigidbody` para que `SphereCastNonAlloc`/`BoxCastNonAlloc` lo
+> detecten de forma confiable.** Un collider puramente estatico (sin Rigidbody) recibe `Raycast` sin
+> problema, pero las queries de barrido de forma (sphere/box cast, que es lo que usa `ApplyCollisionVeto()`)
+> no lo detectan contra un mesh concavo sin Rigidbody — es una limitacion de PhysX, no un bug de este
+> script. El Rigidbody agregado debe quedar en **`Is Kinematic = true`**: sin eso, el gripper (que tambien
+> es Kinematic) empuja fisicamente al objeto en vez de solo detectarlo, porque un Kinematic siempre puede
+> mover a un Rigidbody dinamico que toca. Confirmado empiricamente sobre `Rack` (2026-08-17): sin
+> Rigidbody, atravesable pese a tener `MeshCollider` correcto (no-convexo, mesh real, layer `Entorno`); con
+> Rigidbody no-kinematico, detectado pero empujable. Pendiente de confirmar que con `Is Kinematic` activo
+> se obtienen ambas cosas (detectado y fijo). Ver entrada correspondiente en
+> `_REGISTRO_PRUEBAS_CONTROL.md`.
 
 Los colliders del entorno se generan con `Assets/Editor/EnvironmentColliderTool.cs`. No se pueden
 obtener activando "Generate Colliders" en el importador de los FBX: la escena instancia los `.prefab`
