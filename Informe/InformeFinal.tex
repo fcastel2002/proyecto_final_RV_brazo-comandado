@@ -35,7 +35,7 @@
         {\Large \textbf{Realidad Virtual -- Facultad de Ingeniería}}\\[1cm]
 
         % ── Imagen del robot ────────────────────────────────────────────────
-        \includegraphics[width=0.82\textwidth]{KUKA_Flange.png}\\[0.7cm]
+        \includegraphics[width=0.92\textwidth]{KUKA_Flange.png}\\[0.7cm]
 
         % ── Profesores ──────────────────────────────────────────────────────
         {\large \textbf{Profesores}}\\[0.2cm]
@@ -171,7 +171,7 @@ La aplicación de entrenamiento fue desarrollada en \textbf{Unity 6000.3 LTS} ut
 % ─── 4.1 ─────────────────────────────────────────────────────────────────────
 \subsection{Listado de Comandos y Canvas}
 
-La interfaz de usuario en pantalla (\textit{Canvas}) fue implementada utilizando el sistema UI de Unity y permanece visible durante toda la sesión de entrenamiento. El panel se organiza en dos bloques principales, visibles en la Figura~\ref{fig:unity_hud}: el bloque de \textbf{Acciones de Control (PID)}, que muestra en tiempo real los valores de acción de control (${^\circ}/s^2$) calculados por el controlador PID de cada articulación (J1--J6), y la \textbf{Guía de Controles (PS4)}, que lista el mapeo de botones y palancas del joystick para referencia inmediata del operador. En la esquina inferior izquierda se presenta la \textbf{cámara del gripper}, una sub-ventana que muestra la vista en tiempo real desde una cámara montada sobre el efector final, facilitando el posicionamiento preciso de la garra sobre las celdas de batería.
+La interfaz de usuario en pantalla (\textit{Canvas}) fue implementada utilizando el sistema UI de Unity y permanece visible durante toda la sesión de entrenamiento. El panel se organiza en tres bloques principales, visibles en la Figura~\ref{fig:unity_hud}: el bloque de \textbf{Acciones de Control (PID)}, que muestra en tiempo real los valores de acción de control (${^\circ}/s^2$) calculados por el controlador PID de cada articulación (J1--J6); la \textbf{Guía de Controles (PS4)}, que lista el mapeo de botones y palancas del joystick para referencia inmediata del operador; y \textbf{Métricas de Desempeño}, descripto al final de esta sección. En la esquina inferior izquierda se presenta la \textbf{cámara del gripper}, una sub-ventana que muestra la vista en tiempo real desde una cámara montada sobre el efector final, facilitando el posicionamiento preciso de la garra sobre las celdas de batería.
 
 \begin{figure}[H]
     \centering
@@ -255,11 +255,48 @@ En modo Robot, el componente \texttt{JoystickAdapter} construye en cada \texttt{
     \Delta\mathbf{p} = \bigl(\hat{\mathbf{d}}_X \cdot u_X
                            + \hat{\mathbf{Y}}_{\text{mundo}} \cdot u_Y
                            + \hat{\mathbf{d}}_Z \cdot u_Z\bigr)
-                       \cdot v \cdot \lambda_{\text{payload}} \cdot \Delta t
+                       \cdot v \cdot \lambda_{\text{payload}} \cdot \lambda_{\text{prox}} \cdot \Delta t
     \label{eq:delta_p}
 \end{equation}
 
-donde $u_X, u_Y, u_Z \in [-1,1]$ son los valores leídos de las acciones \texttt{MoveX}, \texttt{MoveY} y \texttt{MoveZ}; $v$ es la velocidad máxima configurada en el Inspector; $\hat{\mathbf{d}}_X$ y $\hat{\mathbf{d}}_Z$ son los versores mundo asignados por el remapeo geométrico (Sección~\ref{sec:remap}) con signo fijo $+1$; y $\lambda_{\text{payload}} \in (0, 1]$ es un factor de penalización proporcional a la masa del objeto agarrado ---implementado en \texttt{JoystickAdapter} como \texttt{payloadSpeedMultiplier}--- que reduce la velocidad cartesiana de la consigna conforme aumenta la carga, produciendo el efecto perceptible de ``carga pesada = movimiento más lento'' en VR. El incremento se aplica sobre la pose actual del TCP y se pasa al solver de cinemática inversa de Flange; si la solución es válida, se actualizan las consignas articulares.
+donde $u_X, u_Y, u_Z \in [-1,1]$ son los valores leídos de las acciones \texttt{MoveX}, \texttt{MoveY} y \texttt{MoveZ}; $v$ es la velocidad máxima configurada en el Inspector; $\hat{\mathbf{d}}_X$ y $\hat{\mathbf{d}}_Z$ son los versores mundo asignados por el remapeo geométrico (Sección~\ref{sec:remap}) con signo fijo $+1$; $\lambda_{\text{payload}} \in (0, 1]$ es un factor de penalización proporcional a la masa del objeto agarrado ---implementado en \texttt{JoystickAdapter} como \texttt{payloadSpeedMultiplier}--- que reduce la velocidad cartesiana de la consigna conforme aumenta la carga, produciendo el efecto perceptible de ``carga pesada = movimiento más lento'' en VR; y $\lambda_{\text{prox}} \in [\lambda_{\text{prox,min}}, 1]$ es un segundo factor de frenado progresivo por proximidad a obstáculos del entorno ---implementado como \texttt{\_proximitySpeedMultiplier}, con $\lambda_{\text{prox,min}} = 0.5$ por defecto--- desarrollado en la Sección~\ref{sec:pid}. El incremento se aplica sobre la pose actual del TCP y se pasa al solver de cinemática inversa de Flange; si la solución es válida, se actualizan las consignas articulares.
+
+El Canvas incorpora además un tercer bloque, \textbf{Métricas de Desempeño}, que instrumenta en tiempo real los indicadores objetivos mencionados en la introducción: cantidad de colisiones, tiempo por operación y cantidad de operaciones completadas. \texttt{PerformanceMetricsTracker} observa las transiciones de \texttt{GripperController.\allowbreak IsHoldingObject}: al agarrar un objeto arranca un cronómetro y, al soltarlo, calcula la duración de la operación y suma un contador de operaciones completadas; mientras el gripper sostiene algo, reporta también su masa en vivo (Figuras~\ref{fig:metrics_tracker_script} y \ref{fig:inspector_metricstracker}). La cuenta de colisiones la aporta \texttt{GripperCollisionCounter}, que detecta contactos por \textit{trigger} ---no por colisión sólida, ya que el \texttt{Rigidbody} del gripper es Kinemático y los obstáculos del entorno suelen carecer de \texttt{Rigidbody}, combinación para la que Unity no garantiza \texttt{OnCollisionEnter}--- contra cualquier objeto que no tenga el tag \texttt{"Agarrable"}, deduplicando por objeto para no contar dos veces un mismo contacto sostenido por varios colliders del gripper, e ignorando al propio robot mediante un \texttt{Ignore Root} configurable (Figuras~\ref{fig:metrics_collision_counter_script} y \ref{fig:inspector_collisioncounter}). Los cuatro valores se muestran en \texttt{PerformanceMetricsPanel}, con el mismo patrón de clonado de fila plantilla que ya usan los paneles de Acciones de Control y Guía de Controles (Figura~\ref{fig:metrics_canvas_hud}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.3\textwidth]{4.1-metrics-canvas-hud.png}
+    \caption{Bloque \textbf{Métricas de Desempeño} del Canvas: colisiones, tiempo de operación, operaciones totales y masa agarrada, actualizados en tiempo real.}
+    \label{fig:metrics_canvas_hud}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\textwidth]{metrics-tracker-script.png}
+    \caption{\texttt{PerformanceMetricsTracker.Update()}: arranca/detiene el cronómetro de operación según \texttt{GripperController.IsHoldingObject} y reporta la masa agarrada en vivo.}
+    \label{fig:metrics_tracker_script}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{inspector-metricstracker.png}
+    \caption{Componente \texttt{PerformanceMetricsTracker} en el Inspector: referencias a \texttt{Gripper Controller} y \texttt{Metrics Panel}.}
+    \label{fig:inspector_metricstracker}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{metrics-collision-counter-script.png}
+    \caption{\texttt{GripperCollisionCounter}: cuenta contactos por \textit{trigger} contra objetos no agarrables, ignorando al propio robot vía \texttt{Ignore Root}.}
+    \label{fig:metrics_collision_counter_script}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{inspector-collisioncounter.png}
+    \caption{Componente \texttt{GripperCollisionCounter} en el Inspector: \texttt{Ignore Root} apuntando a la raíz del robot para no autocontarse.}
+    \label{fig:inspector_collisioncounter}
+\end{figure}
 
 % ─── 4.2 ─────────────────────────────────────────────────────────────────────
 \subsection{Remapeo Geométrico de Direcciones}
@@ -294,6 +331,7 @@ también con signo positivo fijo. De este modo, empujar el analógico izquierdo 
 
 % ─── 4.3 ─────────────────────────────────────────────────────────────────────
 \subsection{Control PID en Articulaciones}
+\label{sec:pid}
 
 Cuando el solver de Flange devuelve una solución IK válida, \texttt{JoystickAdapter} no aplica los ángulos resultantes directamente sobre el \texttt{MechanicalGroup}: el \texttt{JointTarget} obtenido se pasa como consigna al método \texttt{ApplyPID()}, que calcula para cada una de las seis articulaciones un torque virtual (Figura~\ref{fig:applypid_parte1}), lo convierte en una aceleración angular ponderada por la inercia efectiva del eslabón y finalmente integra posición y velocidad respetando límites físicos y de seguridad (Figura~\ref{fig:applypid_parte2}).
 
@@ -389,16 +427,16 @@ Además del control PID, \texttt{JoystickAdapter} aplica dos capas de asistencia
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.32\textwidth]{extra-05-pausemenu-proximity-buttons_a.png}
+    \includegraphics[width=0.4\textwidth]{extra-05-pausemenu-proximity-buttons_a.png}
     \hfill
-    \includegraphics[width=0.32\textwidth]{extra-05-pausemenu-proximity-buttons_b.png}
+    \includegraphics[width=0.4\textwidth]{extra-05-pausemenu-proximity-buttons_b.png}
     \caption{Menú de pausa (\texttt{PauseMenuController}) para los dos perfiles de joystick soportados: PS4 (izquierda) y VR-2 (derecha), con los botones \emph{Frenado prox.} y \emph{Bloqueo desc.} que ciclan entre los presets configurados.}
     \label{fig:pausemenu_proximidad}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{extra-03-applycollisionveto.png}
+    \includegraphics[width=0.65\textwidth]{extra-03-applycollisionveto.png}
     \caption{\texttt{ApplyCollisionVeto()}: recorta el paso cartesiano del efector antes de tocar un obstáculo del entorno, ignorando el propio robot, la pieza agarrada y las superficies muy horizontales.}
     \label{fig:applycollisionveto}
 \end{figure}
@@ -426,7 +464,7 @@ La apertura y cierre de la garra se controla con un único botón (acción \text
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{4.4-03-inspector-ctrlrg2.png}
+    \includegraphics[width=0.7\textwidth]{4.4-03-inspector-ctrlrg2.png}
     \caption{Configuración del componente \texttt{Ctrl\_OnRobotRG2\_Custom}: acción de entrada (R3) y velocidades de apertura/cierre.}
     \label{fig:inspector_ctrlrg2}
 \end{figure}
@@ -469,7 +507,7 @@ La lógica de agarre vive en \texttt{GripperController} y no depende únicamente
 \end{figure}
 
 
-La proximidad para la realimentación háptica y para el frenado por proximidad (Sección 4.3 bis / Extras) se mide con cinco instancias de \texttt{GripperDistanceSensor}, cada una con un rol distinto. El sensor inferior opera en modo \textit{Sphere Cast} ---un rayo con grosor de 0.01\,m trazado a lo largo de un único eje--- y es el único que alimenta el HUD de agarre seguro (\texttt{IsGripDistanceSafe}, entre 0.01 y 0.05\,m) y el frenado por proximidad del brazo, ya que exige una lectura puntual y precisa justo debajo del gripper (Figura~\ref{fig:inspector_distancesensor_inferior}). Cuatro sensores laterales adicionales (\texttt{Sensor\_Distancia\_Derecho/Izquierdo/Frontal/Trasero}) operan en modo \textit{Cono}, con un muestreo de \texttt{Physics.OverlapSphereNonAlloc} (8 muestras, $22.5{^\circ}$ de semiángulo, hasta 0.4\,m) que promedia sobre un área en lugar de un único punto (Figura~\ref{fig:distancesensor_measurecone}); no participan del frenado ni del HUD (Figura~\ref{fig:inspector_distancesensor_lateral}), y su única función es disparar el motor háptico de forma independiente ante un obstáculo cercano en su dirección, como aviso temprano de colisión lateral durante el traslado del TCP. Independientemente de ese umbral de seguridad, cuando no hay ningún objeto agarrado y la distancia detectada cae por debajo de \texttt{vibrationStartDistance} (0.15\,m, con histéresis hasta 0.18\,m para desactivar), cualquiera de los cinco sensores puede activar la vibración del joystick a través de \texttt{JoystickVibrationHidOutput.SetMotor(true)}, de forma independiente entre sí (Figura~\ref{fig:distancesensor_vibration}).
+La proximidad para la realimentación háptica y para el frenado por proximidad (Sección 4.3 bis / Extras) se mide con cinco instancias de \texttt{GripperDistanceSensor}, cada una con un rol distinto. El sensor inferior opera en modo \textit{Sphere Cast} ---un rayo con grosor de 0.01\,m trazado a lo largo de un único eje--- y es el único que alimenta el HUD de agarre seguro (\texttt{IsGripDistanceSafe}, entre 0.01 y 0.05\,m) y el frenado por proximidad del brazo, ya que exige una lectura puntual y precisa justo debajo del gripper (Figura~\ref{fig:inspector_distancesensor_inferior}). Cuatro sensores laterales adicionales (\texttt{Sensor\_Distancia\_Derecho\allowbreak/Izquierdo/Frontal/Trasero}) operan en modo \textit{Cono}, con un muestreo de \texttt{Physics.OverlapSphereNonAlloc} (8 muestras, $22.5{^\circ}$ de semiángulo, hasta 0.4\,m) que promedia sobre un área en lugar de un único punto (Figura~\ref{fig:distancesensor_measurecone}); no participan del frenado ni del HUD (Figura~\ref{fig:inspector_distancesensor_lateral}), y su única función es disparar el motor háptico de forma independiente ante un obstáculo cercano en su dirección, como aviso temprano de colisión lateral durante el traslado del TCP. Independientemente de ese umbral de seguridad, cuando no hay ningún objeto agarrado y la distancia detectada cae por debajo de \texttt{vibrationStartDistance} (0.15\,m, con histéresis hasta 0.18\,m para desactivar), cualquiera de los cinco sensores puede activar la vibración del joystick a través de \texttt{JoystickVibrationHidOutput.SetMotor(true)}, de forma independiente entre sí (Figura~\ref{fig:distancesensor_vibration}).
 
 \begin{figure}[H]
     \centering
@@ -480,7 +518,7 @@ La proximidad para la realimentación háptica y para el frenado por proximidad 
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{4.4-09-distancesensor-measurecone.png}
+    \includegraphics[width=0.65\textwidth]{4.4-09-distancesensor-measurecone.png}
     \caption{Método \texttt{MeasureWithCone()} de \texttt{GripperDistanceSensor}: muestreo cónico mediante \texttt{OverlapSphereNonAlloc}, usado por los cuatro sensores laterales.}
     \label{fig:distancesensor_measurecone}
 \end{figure}
@@ -494,7 +532,7 @@ La proximidad para la realimentación háptica y para el frenado por proximidad 
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{4.4-11-distancesensor-vibration.png}
+    \includegraphics[width=0.57\textwidth]{4.4-11-distancesensor-vibration.png}
     \caption{\texttt{UpdateJoystickVibration()} y \texttt{SetProximityVibration()}: activación de la vibración por histéresis, independiente en cada una de las cinco instancias.}
     \label{fig:distancesensor_vibration}
 \end{figure}
@@ -503,14 +541,14 @@ El envío del comando de vibración desde Unity al joystick RPi Pico opera por d
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{4.4-12-vibrationhid-hidwrite.png}
+    \includegraphics[width=0.8\textwidth]{4.4-12-vibrationhid-hidwrite.png}
     \caption{\texttt{TrySendRequestedState()}: escritura del reporte HID de dos bytes hacia el joystick RPi Pico, con reconexión automática si falla.}
     \label{fig:vibrationhid_hidwrite}
 \end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.85\textwidth]{4.4-13-vibrationhid-ps4path.png}
+    \includegraphics[width=0.8\textwidth]{4.4-13-vibrationhid-ps4path.png}
     \caption{\texttt{TrySendPs4RequestedState()}: camino alternativo de vibración, replicando el estado del motor como \textit{rumble} nativo en un gamepad PS4 conectado.}
     \label{fig:vibrationhid_ps4path}
 \end{figure}
@@ -545,7 +583,7 @@ La aplicación Unity actúa como \textbf{servidor UDP} con arquitectura de suscr
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\textwidth]{extra-04-connectedclientspanel.png}
+    \includegraphics[width=1\textwidth]{extra-04-connectedclientspanel.png}
     \caption{HUD del operador en Play Mode: panel \emph{"Clientes conectados"} listando en vivo las IPs suscriptas al servidor UDP.}
     \label{fig:connectedclientspanel}
 \end{figure}
@@ -612,5 +650,48 @@ La comunicación se verifica sobre la red virtual \textbf{Tailscale}, que conect
     \caption{Dashboard web móvil: misma aplicación servida al teléfono vía Tailscale, con la vista 3D y los gauges articulares en formato vertical.}
     \label{fig:dashboard_celular}
 \end{figure}
+
+% ─── 4.6 ─────────────────────────────────────────────────────────────────────
+\subsection{Herramientas de Autoría de Contenido}
+
+Los props de la escena industrial ---caja de batería, cajón de madera de transporte y rack metálico Eternity--- se generan mediante un pipeline reproducible de dos etapas, en lugar de ser \textit{assets} modelados a mano. Primero, un script de Python independiente por prop (\texttt{generar\_textura\_bateria.py}, \texttt{generar\_textura\_caja\_madera.py}, \texttt{generar\_textura\_rack.py}, con \textit{Pillow} y \textit{NumPy}) genera proceduralmente un atlas $2\times2$ de textura albedo y su mapa de normales correspondiente, con cada celda del atlas mapeada a una cara distinta del objeto (Figuras~\ref{fig:textura_atlas_cajabateria}, \ref{fig:textura_atlas_cajamadera} y \ref{fig:textura_atlas_racketernity}). Segundo, una herramienta de Editor de Unity por prop (\texttt{CajaBateriaMeshTool.cs}, \texttt{CajaMaderaMeshTool.cs}, \texttt{RackEternityMeshTool.cs}), agregada al menú \texttt{Herramientas} (Figura~\ref{fig:editor_menu_herramientas}), construye un mesh con UV por cara mapeadas exactamente a esas celdas ---a diferencia del \texttt{Cube} nativo de Unity, que manda las seis caras al mismo cuadrado UV $0..1$--- y lo aplica junto con el material correspondiente a los objetos de la escena, ya sea buscando automáticamente los que usan el material anterior o sobre la selección actual en la Hierarchy (Figura~\ref{fig:meshtool_cajabateria}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.55\textwidth]{EditorMenuHerramientas.png}
+    \caption{Menú \texttt{Herramientas}: generación y aplicación de malla + textura para cada prop de la escena (caja de batería, caja de madera, rack Eternity).}
+    \label{fig:editor_menu_herramientas}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.4\textwidth]{T_CajaBateria_Eternity_Atlas.png}
+    \hfill
+    \includegraphics[width=0.4\textwidth]{T_CajaMadera_Atlas.png}
+
+    \vspace{0.4cm}
+    \includegraphics[width=0.37\textwidth]{T_RackEternity_Atlas.png}
+    \caption{Atlas de textura $2\times2$ generado proceduralmente para cada prop de la escena: caja de batería Eternity, cajón de madera de transporte y rack metálico Eternity.}
+    \label{fig:texturas_atlas_props}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{meshtool-cajabateria-generarmesh.png}
+    \caption{\texttt{CajaBateriaMeshTool.GenerarMesh()}: construye un cubo con UV por cara, cada una mapeada hacia su celda correspondiente del atlas.}
+    \label{fig:meshtool_cajabateria}
+\end{figure}
+
+Para el cajón de madera y el rack, cuya función exige un hueco interior donde apoyar o extraer las celdas de batería, el mesh no es un cubo cerrado sino una bandeja hueca (piso, cuatro paredes exteriores, borde superior, cuatro paredes interiores y piso interior), y la herramienta además reemplaza los colliders del objeto por un conjunto de cinco \texttt{BoxCollider} (piso más cuatro paredes) que respetan ese hueco, en vez del \texttt{BoxCollider} sólido de un \texttt{Cube} nativo, que impediría que las celdas se apoyen o extraigan del interior (Figura~\ref{fig:meshtool_rack}).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{meshtool-racketernity-bandeja.png}
+    \caption{\texttt{RackEternityMeshTool.GenerarMesh()}: el rack se construye como una bandeja hueca, no como un cubo cerrado, para dejar espacio a las celdas de batería.}
+    \label{fig:meshtool_rack}
+\end{figure}
+
+Cada herramienta ofrece dos entradas de menú: \textbf{"Generar mesh y aplicar..."}, que regenera el mesh o el \textit{asset} y busca automáticamente en la escena todos los objetos que ya usan el material del prop, aplicándoselos; y \textbf{"Aplicar a la selección"}, que aplica malla y material (y, para caja y rack, reconfigura los colliders) solo a los objetos seleccionados en la Hierarchy, útil para instancias nuevas.
+
 \printbibliography
 \end{document}
