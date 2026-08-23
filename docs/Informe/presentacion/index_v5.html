@@ -1,0 +1,1968 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrenamiento VR para teleoperación segura de brazos robóticos</title>
+<style>
+/* ============================================================
+   SISTEMA DE DISEÑO
+   ============================================================ */
+:root{
+  /* ============================================================
+     ESCALA TIPOGRÁFICA MODULAR
+     Una sola fuente de verdad: para agrandar o achicar TODA la
+     presentación de forma proporcional, cambiar --fs-base y/o
+     --fs-ratio acá. Todo el resto de los tamaños de fuente del
+     documento se calculan a partir de estos dos números.
+     ============================================================ */
+  --user-scale:1;                                     /* control en vivo, botones A-/A+ */
+  --fs-ratio:1.16;
+  --fs-base:calc(23px * var(--user-scale));            /* cuerpo de texto */
+  --fs-n3:calc(var(--fs-base) / var(--fs-ratio) / var(--fs-ratio) / var(--fs-ratio)); /* micro-etiquetas mono */
+  --fs-n2:calc(var(--fs-base) / var(--fs-ratio) / var(--fs-ratio));  /* texto secundario chico */
+  --fs-n1:calc(var(--fs-base) / var(--fs-ratio));                    /* texto secundario */
+  --fs-0: var(--fs-base);                                            /* cuerpo */
+  --fs-1: calc(var(--fs-base) * var(--fs-ratio));                    /* subtítulos / lead */
+  --fs-2: calc(var(--fs-1) * var(--fs-ratio));                       /* h3 / números chicos */
+  --fs-3: calc(var(--fs-2) * var(--fs-ratio));
+  --fs-4: calc(var(--fs-3) * var(--fs-ratio));                       /* stat grandes */
+  --fs-5: calc(var(--fs-4) * var(--fs-ratio));                       /* h2 */
+  --fs-6: calc(var(--fs-5) * var(--fs-ratio));                       /* h1 */
+  --fs-7: calc(var(--fs-6) * var(--fs-ratio));
+
+  /* Escala de espaciado — mismo principio: un base y un ratio. */
+  --sp-ratio:1.32;
+  --sp-base:calc(23px * var(--user-scale));
+  --sp-n2:calc(var(--sp-base) / var(--sp-ratio) / var(--sp-ratio));
+  --sp-n1:calc(var(--sp-base) / var(--sp-ratio));
+  --sp-0: var(--sp-base);
+  --sp-1: calc(var(--sp-base) * var(--sp-ratio));
+  --sp-2: calc(var(--sp-1) * var(--sp-ratio));
+  --sp-3: calc(var(--sp-2) * var(--sp-ratio));
+  --sp-4: calc(var(--sp-3) * var(--sp-ratio));
+
+  /* Tema A · Claro neutro (por defecto) */
+  --bg:#f4f5f8;
+  --bg-2:#ffffff;
+  --panel:rgba(16,22,38,.04);
+  --panel-2:rgba(16,22,38,.075);
+  --line:rgba(16,22,38,.13);
+  --line-2:rgba(16,22,38,.24);
+  --fg:#0c0e13;
+  --muted:#1d222b;
+  --dim:#4a5266;
+  --accent:#c2410c;
+  --accent-soft:rgba(194,65,12,.10);
+  --accent-border:rgba(194,65,12,.32);
+  --accent-2:#0369a1;
+  --accent-2-soft:rgba(3,105,161,.09);
+  --accent-2-border:rgba(3,105,161,.32);
+  --ok:#15803d;
+  --ok-soft:rgba(21,128,61,.10);
+  --ok-border:rgba(21,128,61,.32);
+  --warn:#a15c07;
+  --danger:#b91c1c;
+  --danger-soft:rgba(185,28,28,.10);
+  --danger-border:rgba(185,28,28,.30);
+  --violet:#6d28d9;
+  --violet-soft:rgba(109,40,217,.09);
+  --violet-border:rgba(109,40,217,.30);
+  --chip-a-fg:#9a3412;
+  --chip-b-fg:#075985;
+  --track:rgba(16,22,38,.09);
+  --diag-fill:rgba(16,22,38,.035);
+  --sans:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,Inter,Roboto,"Helvetica Neue",sans-serif;
+  --mono:"Cascadia Code","Cascadia Mono",Consolas,ui-monospace,"SF Mono",Menlo,monospace;
+  --r:14px;
+}
+
+/* Tema B · Cálido (cream) */
+body.theme-b{
+  --bg:#faf5eb;
+  --bg-2:#fffdf8;
+  --panel:rgba(50,36,16,.045);
+  --panel-2:rgba(50,36,16,.08);
+  --line:rgba(50,36,16,.14);
+  --line-2:rgba(50,36,16,.25);
+  --fg:#170f07;
+  --muted:#2c2013;
+  --dim:#5c4b36;
+  --accent:#b1440e;
+  --accent-soft:rgba(177,68,14,.11);
+  --accent-border:rgba(177,68,14,.34);
+  --accent-2:#0e7490;
+  --accent-2-soft:rgba(14,116,144,.10);
+  --accent-2-border:rgba(14,116,144,.32);
+  --ok:#4d7c0f;
+  --ok-soft:rgba(77,124,15,.11);
+  --ok-border:rgba(77,124,15,.32);
+  --warn:#a16207;
+  --danger:#b91c1c;
+  --danger-soft:rgba(185,28,28,.10);
+  --danger-border:rgba(185,28,28,.30);
+  --violet:#86198f;
+  --violet-soft:rgba(134,25,143,.09);
+  --violet-border:rgba(134,25,143,.30);
+  --chip-a-fg:#8a3006;
+  --chip-b-fg:#0c4a5c;
+  --track:rgba(50,36,16,.10);
+  --diag-fill:rgba(50,36,16,.04);
+}
+
+/* Tema C · Alto contraste (blanco puro, texto negro, trazos marcados) */
+body.theme-c{
+  --bg:#ffffff;
+  --bg-2:#ffffff;
+  --panel:rgba(0,0,0,.035);
+  --panel-2:rgba(0,0,0,.075);
+  --line:rgba(0,0,0,.22);
+  --line-2:rgba(0,0,0,.38);
+  --fg:#000000;
+  --muted:#101010;
+  --dim:#3d3d3d;
+  --accent:#b8390f;
+  --accent-soft:rgba(184,57,15,.10);
+  --accent-border:rgba(184,57,15,.4);
+  --accent-2:#025684;
+  --accent-2-soft:rgba(2,86,132,.09);
+  --accent-2-border:rgba(2,86,132,.4);
+  --ok:#106b32;
+  --ok-soft:rgba(16,107,50,.10);
+  --ok-border:rgba(16,107,50,.4);
+  --warn:#8a4a06;
+  --danger:#a30f0f;
+  --danger-soft:rgba(163,15,15,.10);
+  --danger-border:rgba(163,15,15,.38);
+  --violet:#5b21b6;
+  --violet-soft:rgba(91,33,182,.09);
+  --violet-border:rgba(91,33,182,.38);
+  --chip-a-fg:#7a2607;
+  --chip-b-fg:#013a58;
+  --track:rgba(0,0,0,.13);
+  --diag-fill:rgba(0,0,0,.03);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:var(--sans)}
+body{
+  background:
+    radial-gradient(1200px 700px at 78% -10%,var(--accent-soft),transparent 62%),
+    radial-gradient(900px 600px at 10% 108%,var(--accent-2-soft),transparent 60%),
+    var(--bg);
+}
+::selection{background:var(--accent);color:#fff}
+
+/* ============================================================
+   BARRA DE CONTROLES (temporal, para probar en el aula)
+   ============================================================ */
+#toolbar{position:fixed;right:18px;top:16px;z-index:70;display:flex;gap:10px}
+#themeSwitch,#fontScale{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.85);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border:1px solid rgba(0,0,0,.14);border-radius:999px;padding:6px;
+  box-shadow:0 4px 18px rgba(0,0,0,.14);
+}
+#themeSwitch button,#fontScale button{
+  font:600 12.5px/1 var(--mono);letter-spacing:.03em;
+  padding:8px 14px;border-radius:999px;border:1px solid transparent;cursor:pointer;
+  background:transparent;color:#3a4152;transition:background .15s,color .15s,border-color .15s;
+}
+#themeSwitch button:hover,#fontScale button:hover{background:rgba(0,0,0,.06)}
+#themeSwitch button.on{background:#1c2333;color:#fff;border-color:#1c2333}
+#fontScale button{padding:8px 13px;font-size:14px;font-weight:700}
+#fontScale button:disabled{opacity:.35;cursor:default}
+#fontScale button:disabled:hover{background:transparent}
+#fontScale .pct{
+  font:700 12.5px/1 var(--mono);color:#3a4152;min-width:38px;text-align:center;
+  padding:0 2px;
+}
+
+/* ============================================================
+   ESCENARIO 16:9 ESCALADO
+   ============================================================ */
+#stage{
+  position:absolute;left:50%;top:50%;
+  width:1600px;height:900px;
+  transform-origin:center center;
+  will-change:transform;
+}
+.slide{
+  position:absolute;inset:0;
+  padding:38px 68px 46px;
+  display:flex;flex-direction:column;
+  opacity:0;visibility:hidden;
+  transform:translateY(22px) scale(.985);
+  transition:opacity .42s cubic-bezier(.22,.9,.3,1),transform .42s cubic-bezier(.22,.9,.3,1),visibility 0s .42s;
+}
+.slide.is-active{opacity:1;visibility:visible;transform:none;transition-delay:0s,0s,0s}
+.slide.is-past{transform:translateY(-22px) scale(.985)}
+
+/* ============================================================
+   TIPOGRAFÍA / CABECERAS
+   ============================================================ */
+.kicker{
+  font:700 var(--fs-n1)/1 var(--mono);
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);
+  display:flex;align-items:center;gap:12px;margin-bottom:var(--sp-n2);
+}
+.kicker::before{content:"";width:26px;height:2px;background:var(--accent);border-radius:2px}
+h1{font-size:var(--fs-7);line-height:1.06;font-weight:700;letter-spacing:-.02em}
+h2{font-size:var(--fs-6);line-height:1.1;font-weight:650;letter-spacing:-.016em}
+h3{font-size:var(--fs-2);line-height:1.2;font-weight:650;letter-spacing:-.01em}
+.s-head{margin-bottom:var(--sp-1);flex:0 0 auto}
+.s-head .sub{margin-top:var(--sp-n1);font-size:var(--fs-1);line-height:1.42;color:var(--muted);max-width:1260px}
+.body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}
+p{font-size:var(--fs-0);line-height:1.5;color:var(--muted)}
+strong{color:var(--fg);font-weight:700}
+em{color:var(--accent-2);font-style:normal;font-weight:600}
+code,.mono{font-family:var(--mono);font-size:.9em;color:var(--accent-2)}
+.u{color:var(--fg);font-weight:600}
+
+/* ============================================================
+   PORTADA
+   ============================================================ */
+.title-slide{padding:0;justify-content:center}
+.title-bg{position:absolute;inset:0;overflow:hidden}
+.title-bg img{width:100%;height:100%;object-fit:cover;transform:scale(1.06);filter:saturate(.85) brightness(.55)}
+.title-slide.is-active .title-bg img{animation:slowzoom 24s ease-out forwards}
+@keyframes slowzoom{from{transform:scale(1.06)}to{transform:scale(1.17)}}
+.title-veil{position:absolute;inset:0;background:
+  linear-gradient(105deg,rgba(10,13,19,.975) 0%,rgba(10,13,19,.91) 42%,rgba(10,13,19,.46) 73%,rgba(10,13,19,.30) 100%);}
+.title-grid{position:absolute;inset:0;opacity:.35;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(900px 600px at 20% 50%,#000 10%,transparent 78%);
+  mask-image:radial-gradient(900px 600px at 20% 50%,#000 10%,transparent 78%);}
+.title-inner{position:relative;padding:0 74px;max-width:1180px}
+.title-logo{height:50px;width:auto;margin-bottom:40px;filter:brightness(0) invert(1);opacity:.92}
+.title-slide h1{font-size:var(--fs-6);max-width:1010px;color:#f5f7fb}
+.title-slide{--fg:#f5f7fb;--muted:#c3cbdb;--accent:#ff6a13;--accent-2:#35c6f4;--dim:#8b96ac}
+.title-rule{width:96px;height:4px;background:var(--accent);border-radius:3px;margin:28px 0}
+.title-course{font:700 var(--fs-n1)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2);margin-bottom:32px}
+.title-people{display:flex;gap:64px;margin-top:4px}
+.title-people .grp .lbl{font:700 var(--fs-n3)/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.title-people .grp .nm{font-size:var(--fs-0);line-height:1.6;color:var(--fg)}
+.title-year{position:absolute;right:74px;bottom:60px;font:700 92px/1 var(--sans);color:rgba(255,255,255,.055);letter-spacing:-.04em}
+
+/* ============================================================
+   REJILLAS Y TARJETAS
+   ============================================================ */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-1)}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-0)}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-n1)}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--sp-n2)}
+.g-6-4{display:grid;grid-template-columns:6fr 4fr;gap:var(--sp-2);align-items:center}
+.g-4-6{display:grid;grid-template-columns:4fr 6fr;gap:var(--sp-2);align-items:center}
+.g-5-7{display:grid;grid-template-columns:5fr 7fr;gap:var(--sp-2);align-items:center}
+.g-7-5{display:grid;grid-template-columns:7fr 5fr;gap:var(--sp-2);align-items:center}
+.g-stretch{align-items:stretch}
+
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--sp-0) calc(var(--sp-0) + 4px);position:relative;overflow:hidden;
+}
+.card.tint{background:linear-gradient(160deg,var(--accent-soft),transparent 62%),var(--panel);border-color:var(--accent-border)}
+.card.tint2{background:linear-gradient(160deg,var(--accent-2-soft),transparent 62%),var(--panel);border-color:var(--accent-2-border)}
+.card.danger{background:linear-gradient(160deg,var(--danger-soft),transparent 62%),var(--panel);border-color:var(--danger-border)}
+.card.ok{background:linear-gradient(160deg,var(--ok-soft),transparent 62%),var(--panel);border-color:var(--ok-border)}
+.card h3{margin-bottom:var(--sp-n2)}
+.card p{font-size:var(--fs-n1);line-height:1.46}
+.card .ico{font-size:var(--fs-2);line-height:1;margin-bottom:var(--sp-n2);display:block}
+.card .num{font:700 var(--fs-n3)/1 var(--mono);color:var(--accent);letter-spacing:.08em;margin-bottom:var(--sp-n2);display:block}
+.card.tint2 .num{color:var(--accent-2)}
+
+/* Variante compacta: para columnas con varias tarjetas apiladas
+   (p.ej. varios bloques de una interfaz), donde el texto normal
+   de tarjeta no entra en el alto disponible. */
+.card.tight{padding:var(--sp-n2) var(--sp-n1)}
+.card.tight .num{margin-bottom:4px}
+.card.tight h3{font-size:var(--fs-0);margin-bottom:4px}
+.card.tight p{font-size:var(--fs-n2);line-height:1.34}
+
+.stat .v{font-size:var(--fs-5);font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--fg)}
+.stat .v .un{font-size:var(--fs-0);font-weight:600;color:var(--muted);margin-left:5px}
+.stat .k{margin-top:var(--sp-n2);font-size:var(--fs-n1);line-height:1.34;color:var(--muted)}
+.stat.acc .v{color:var(--accent)}
+.stat.acc2 .v{color:var(--accent-2)}
+.stat.warn .v{color:var(--warn)}
+
+ul.bul{list-style:none;display:flex;flex-direction:column;gap:var(--sp-n2)}
+ul.bul li{position:relative;padding-left:30px;font-size:var(--fs-0);line-height:1.42;color:var(--muted)}
+ul.bul li::before{
+  content:"";position:absolute;left:6px;top:.58em;width:9px;height:9px;border-radius:2px;
+  background:var(--accent);transform:rotate(45deg);
+}
+ul.bul.c2 li::before{background:var(--accent-2)}
+ul.bul.check li::before{background:var(--ok)}
+ul.bul.no li::before{background:var(--dim)}
+ul.bul.tight{gap:calc(var(--sp-n2) * 0.75)}
+ul.bul.sm li{font-size:var(--fs-n1)}
+ul.bul li b{color:var(--fg);font-weight:700}
+
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{
+  font:700 var(--fs-n3)/1 var(--mono);letter-spacing:.02em;
+  padding:9px 15px;border-radius:999px;
+  background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
+}
+.chip.a{background:var(--accent-soft);border-color:var(--accent-border);color:var(--chip-a-fg)}
+.chip.b{background:var(--accent-2-soft);border-color:var(--accent-2-border);color:var(--chip-b-fg)}
+
+.eq{
+  background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:10px;padding:var(--sp-n1) var(--sp-0);
+  font-family:var(--mono);font-size:var(--fs-1);line-height:1.62;color:var(--fg);
+  overflow-x:auto;
+}
+.eq.c2{border-left-color:var(--accent-2)}
+.eq.sm{font-size:var(--fs-0);padding:calc(var(--sp-n1) - 2px) var(--sp-n1)}
+.eq .lbl{display:block;font-size:var(--fs-n3);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:var(--sp-n2)}
+.eq sub{font-size:.66em;color:var(--muted)}
+.eq .hi{color:var(--accent)}
+.eq .hi2{color:var(--accent-2)}
+.eq .note{display:block;margin-top:var(--sp-n2);font-family:var(--sans);font-size:var(--fs-n2);line-height:1.42;color:var(--dim)}
+
+.fig{display:flex;flex-direction:column;gap:10px;min-height:0}
+.fig .box{
+  position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  background:var(--bg-2);cursor:zoom-in;flex:1 1 auto;min-height:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.fig .box img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.fig .box.fill img{width:100%;height:100%;object-fit:cover}
+.fig .box::after{
+  content:"\2921";position:absolute;right:9px;bottom:7px;
+  font-size:14px;color:#f5f7fb;opacity:0;transition:opacity .2s;
+  background:rgba(10,13,19,.82);border:1px solid var(--line);border-radius:6px;padding:2px 7px;
+}
+.fig .box:hover::after{opacity:.9}
+.fig figcaption{font-size:var(--fs-n2);line-height:1.4;color:var(--dim);flex:0 0 auto}
+.fig figcaption b{color:var(--muted);font-weight:600}
+
+table.t{width:100%;border-collapse:collapse;font-size:var(--fs-n1)}
+table.t th{
+  text-align:left;padding:11px 14px;font:700 var(--fs-n3)/1.3 var(--mono);
+  letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+  border-bottom:1px solid var(--line-2);
+}
+table.t td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top;line-height:1.38}
+table.t tr:last-child td{border-bottom:0}
+table.t td.k{font-family:var(--mono);color:var(--accent-2);font-size:var(--fs-n2);white-space:nowrap}
+table.t td b{color:var(--fg);font-weight:600}
+table.t.sm{font-size:var(--fs-n2)}
+table.t.sm td{padding:9px 13px}
+
+/* ============================================================
+   FRAGMENTOS (revelado paso a paso)
+   ============================================================ */
+.frag{opacity:0;transform:translateY(14px);transition:opacity .38s ease,transform .38s cubic-bezier(.22,.9,.3,1)}
+.frag.on{opacity:1;transform:none}
+.frag.fade{transform:none}
+.frag.left{transform:translateX(-18px)}
+.frag.grow{transform:scale(.94);transform-origin:left center}
+
+/* ============================================================
+   BARRA SUPERIOR / HUD
+   ============================================================ */
+#topbar{position:fixed;left:0;top:0;width:100%;height:3px;background:var(--track);z-index:60}
+#prog{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .35s cubic-bezier(.22,.9,.3,1)}
+#hud{
+  position:fixed;right:18px;bottom:14px;z-index:60;
+  display:flex;align-items:center;gap:13px;
+  font:700 13.5px/1 var(--mono);color:#cfd6e6;
+  background:rgba(15,19,28,.82);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:9px 16px;
+}
+#hud .n b{color:#fff}
+#hud .n{color:#cfd6e6}
+#hud .sec{color:#9aa4ba;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#hud .dot{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.28);flex:0 0 auto}
+#hud kbd{font:inherit;color:#cfd6e6;border:1px solid rgba(255,255,255,.22);border-radius:5px;padding:2px 6px}
+
+#notes{
+  position:fixed;left:18px;bottom:14px;right:330px;z-index:60;
+  --fg:#f5f7fb;--muted:#c3cbdb;--dim:#93a0b8;
+  background:rgba(10,13,19,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.14);border-left:3px solid var(--accent-2);
+  border-radius:10px;padding:12px 16px;
+  font-size:var(--fs-n2);line-height:1.5;color:var(--muted);
+  display:none;max-height:126px;overflow:auto;
+}
+body.show-notes #notes{display:block}
+#notes b{color:var(--fg)}
+.notes-src{display:none}
+
+/* ============================================================
+   VISTA GENERAL
+   ============================================================ */
+#overview{
+  position:fixed;inset:0;z-index:80;background:rgba(6,8,13,.975);
+  --panel:rgba(255,255,255,.055);--panel-2:rgba(255,255,255,.095);
+  --line:rgba(255,255,255,.15);--line-2:rgba(255,255,255,.26);
+  --fg:#f5f7fb;--muted:#c3cbdb;--dim:#93a0b8;--accent-soft:rgba(255,140,66,.2);
+  display:none;padding:40px;overflow:auto;
+}
+body.overview #overview{display:block}
+#ovGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;max-width:1480px;margin:0 auto}
+.ov-item{
+  border:1px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;
+  background:var(--panel);transition:border-color .18s,background .18s,transform .18s;
+  min-height:84px;display:flex;flex-direction:column;gap:7px;text-align:left;
+  font-family:inherit;color:inherit;
+}
+.ov-item:hover{border-color:var(--line-2);background:var(--panel-2);transform:translateY(-2px)}
+.ov-item.cur{border-color:var(--accent);background:var(--accent-soft)}
+.ov-item .i{font:700 var(--fs-n3)/1 var(--mono);color:var(--dim);letter-spacing:.1em}
+.ov-item.cur .i{color:var(--accent)}
+.ov-item .t{font-size:var(--fs-n2);line-height:1.32;color:var(--fg);font-weight:600}
+#ovHead{max-width:1480px;margin:0 auto 24px;display:flex;align-items:baseline;gap:16px}
+#ovHead h3{font-size:var(--fs-1);color:#f5f7fb}
+#ovHead span{font:600 var(--fs-n3)/1 var(--mono);color:#93a0b8}
+
+/* ============================================================
+   AYUDA
+   ============================================================ */
+#help{
+  position:fixed;inset:0;z-index:90;background:rgba(6,8,13,.94);
+  display:none;align-items:center;justify-content:center;
+}
+body.show-help #help{display:flex}
+#help .panel{
+  background:var(--bg-2);border:1px solid var(--line);border-radius:16px;
+  padding:34px 40px;max-width:540px;
+}
+#help h3{margin-bottom:20px}
+#help dl{display:grid;grid-template-columns:auto 1fr;gap:12px 22px;align-items:center}
+#help dt{font:600 var(--fs-n3)/1 var(--mono);color:var(--accent-2);white-space:nowrap}
+#help dd{font-size:var(--fs-n2);color:var(--muted)}
+#help .foot{margin-top:24px;font-size:var(--fs-n3);color:var(--dim)}
+
+/* ============================================================
+   LIGHTBOX
+   ============================================================ */
+#lb{
+  position:fixed;inset:0;z-index:100;background:rgba(6,8,13,.965);
+  --line:rgba(255,255,255,.16);
+  display:none;align-items:center;justify-content:center;padding:42px;cursor:zoom-out;
+}
+body.lb #lb{display:flex}
+#lb img{max-width:100%;max-height:87%;object-fit:contain;border-radius:10px;border:1px solid var(--line)}
+#lbCap{position:absolute;left:0;right:0;bottom:24px;text-align:center;font-size:var(--fs-n2);color:#c3cbdb;padding:0 60px}
+
+/* ============================================================
+   DIAGRAMAS SVG
+   Los diagramas tienen geometría fija (cajas y coordenadas a mano),
+   así que su texto NO sigue la escala tipográfica general ni el
+   control de tamaño de fuente del usuario — si escalaran con el
+   resto, el texto se sale de las cajas. Tamaños ajustados a mano
+   para el ancho de cada caja.
+   ============================================================ */
+svg.diag{width:100%;height:100%;display:block;overflow:visible}
+svg.diag text{font-family:var(--sans);fill:var(--fg)}
+svg.diag .lb{font-family:var(--mono);font-size:14px;font-weight:700;fill:var(--muted);letter-spacing:.03em}
+svg.diag .lb-s{font-family:var(--mono);font-size:12.5px;font-weight:700;fill:var(--dim);letter-spacing:.05em}
+svg.diag .lb-a{fill:var(--accent)}
+svg.diag .lb-b{fill:var(--accent-2)}
+svg.diag .ti{font-size:16px;font-weight:700;fill:var(--fg)}
+svg.diag .ti-s{font-size:13.5px;font-weight:600;fill:var(--muted)}
+svg.diag .bx{fill:var(--diag-fill);stroke:var(--line);stroke-width:1.2}
+svg.diag .bx-a{fill:var(--accent-soft);stroke:var(--accent-border);stroke-width:1.3}
+svg.diag .bx-b{fill:var(--accent-2-soft);stroke:var(--accent-2-border);stroke-width:1.3}
+svg.diag .bx-g{fill:var(--ok-soft);stroke:var(--ok-border);stroke-width:1.3}
+svg.diag .wire{fill:none;stroke:var(--line-2);stroke-width:1.6}
+svg.diag .wire-a{fill:none;stroke:var(--accent);stroke-width:1.8;opacity:.85}
+svg.diag .wire-b{fill:none;stroke:var(--accent-2);stroke-width:1.8;opacity:.85}
+svg.diag .flow{stroke-dasharray:7 11;animation:march 1.1s linear infinite}
+@keyframes march{to{stroke-dashoffset:-18}}
+svg.diag .flow-slow{stroke-dasharray:5 14;animation:march2 2.2s linear infinite}
+@keyframes march2{to{stroke-dashoffset:-19}}
+svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+/* pipeline */
+.pipe{display:flex;align-items:stretch;gap:0}
+.pipe .step{
+  flex:1;background:var(--panel);border:1px solid var(--line);
+  padding:18px 20px;position:relative;
+}
+.pipe .step:first-child{border-radius:12px 0 0 12px}
+.pipe .step:last-child{border-radius:0 12px 12px 0}
+.pipe .step + .step{border-left:0}
+.pipe .step .n{font:700 var(--fs-n3)/1 var(--mono);color:var(--accent);letter-spacing:.1em;display:block;margin-bottom:8px}
+.pipe .step .t{font-size:var(--fs-n1);font-weight:650;color:var(--fg);line-height:1.22;margin-bottom:6px}
+.pipe .step .d{font-size:var(--fs-n2);line-height:1.36;color:var(--dim)}
+.pipe .step::after{
+  content:"";position:absolute;right:-7px;top:50%;transform:translateY(-50%) rotate(45deg);
+  width:12px;height:12px;background:var(--bg);border-top:1px solid var(--line);border-right:1px solid var(--line);
+  z-index:2;
+}
+.pipe .step:last-child::after{display:none}
+
+.bar{height:9px;border-radius:5px;background:var(--track);overflow:hidden}
+.bar > i{display:block;height:100%;border-radius:5px;background:var(--accent);width:0;transition:width .9s cubic-bezier(.22,.9,.3,1)}
+.frag.on .bar > i{width:var(--w,50%)}
+
+.mt8{margin-top:10px}.mt12{margin-top:15px}.mt16{margin-top:20px}.mt20{margin-top:24px}
+.mt26{margin-top:30px}.mt34{margin-top:38px}
+.mb10{margin-bottom:13px}.mb16{margin-bottom:20px}.mb20{margin-bottom:24px}
+.center{text-align:center}
+.small{font-size:var(--fs-n1)}
+.tiny{font-size:var(--fs-n2);line-height:1.42}
+.fs{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.rowc{display:flex;align-items:center;gap:14px}
+.sep{height:1px;background:var(--line);margin:18px 0}
+</style>
+</head>
+<body>
+<div id="topbar"><div id="prog"></div></div>
+<div id="toolbar">
+  <div id="fontScale">
+    <button type="button" id="fsDown" aria-label="Achicar fuente">A−</button>
+    <span class="pct" id="fsPct">100%</span>
+    <button type="button" id="fsUp" aria-label="Agrandar fuente">A+</button>
+  </div>
+  <div id="themeSwitch">
+    <button type="button" data-theme="a">Claro</button>
+    <button type="button" data-theme="b">Cálido</button>
+    <button type="button" data-theme="c">Contraste</button>
+  </div>
+</div>
+<div id="stage">
+<!-- ============================================================
+     1 · PORTADA
+     ============================================================ -->
+<section class="slide title-slide" data-title="Portada">
+  <div class="title-bg"><img src="../Img/KUKA_Flange.png" alt=""></div>
+  <div class="title-veil"></div>
+  <div class="title-grid"></div>
+  <div class="title-inner">
+    <img class="title-logo" src="../Img/logo_fing_uncu.png" alt="UNCuyo · Facultad de Ingeniería">
+    <div class="title-course">Realidad Virtual &middot; Proyecto Final</div>
+    <h1>Entrenamiento en entorno virtual para la teleoperación segura de brazos robóticos</h1>
+    <div class="title-rule"></div>
+    <div class="title-people">
+      <div class="grp">
+        <div class="lbl">Alumnos</div>
+        <div class="nm">Quiroga, Juan Ignacio &middot; 13889<br>Castel, Francisco &middot; 13784</div>
+      </div>
+      <div class="grp">
+        <div class="lbl">Profesores</div>
+        <div class="nm">Ing. Javier Rosenstein<br>Ing. Carlos Tomba</div>
+      </div>
+      <div class="grp">
+        <div class="lbl">Institución</div>
+        <div class="nm">Ing. Mecatrónica<br>UNCuyo &middot; Mendoza</div>
+      </div>
+    </div>
+  </div>
+  <div class="title-year">2026</div>
+  <div class="notes-src">Presentación del proyecto final de Realidad Virtual. <b>Idea en una frase:</b> un simulador VR donde un operario aprende a teleoperar un brazo KUKA con nuestro propio joystick, antes de tocar el equipo real.</div>
+</section>
+
+<!-- ============================================================
+     2 · EL PROBLEMA
+     ============================================================ -->
+<section class="slide" data-title="El problema: AUTOELEC">
+  <div class="s-head">
+    <div class="kicker">1 &middot; Introducción</div>
+    <h2>Ensamble manual de paquetes de baterías</h2>
+    <p class="sub">La empresa <strong>AUTOELEC</strong> arma paquetes de baterías de plomo-ácido para autoelevadores industriales: cada vaso se ubica <strong>a mano</strong> dentro de un rack metálico.</p>
+  </div>
+  <div class="body">
+    <div class="g2" style="align-items:stretch">
+      <figure class="fig frag" style="height:392px">
+        <div class="box"><img src="../Img/Celdas_Carga.png" alt="Vasos de plomo-ácido en rack"></div>
+        <figcaption><b>Vasos de plomo-ácido</b> dispuestos en rack, previo al ensamble.</figcaption>
+      </figure>
+      <figure class="fig frag" style="height:392px">
+        <div class="box"><img src="../Img/Bateria.png" alt="Paquete de baterías terminado"></div>
+        <figcaption><b>Paquete terminado</b>, marca Eternity — distribuido por AUTOELEC.</figcaption>
+      </figure>
+    </div>
+  </div>
+  <div class="notes-src">Contexto industrial real. El proyecto no parte de un ejercicio académico: parte de una tarea concreta de un cliente. Mencionar que el rack se va llenando y el espacio libre se reduce.</div>
+</section>
+
+<!-- ============================================================
+     3 · RIESGOS
+     ============================================================ -->
+<section class="slide" data-title="Riesgos de la operación manual">
+  <div class="s-head">
+    <div class="kicker">1 &middot; Introducción</div>
+    <h2>Por qué la tarea es un problema</h2>
+  </div>
+  <div class="body">
+    <div class="g4 mb20">
+      <div class="card stat acc frag"><div class="v">20&ndash;100<span class="un">kg</span></div><div class="k">Masa de cada vaso, elevado únicamente con la fuerza del operario</div></div>
+      <div class="card stat warn frag"><div class="v">&darr; espacio</div><div class="k">A medida que el rack se completa, el hueco libre se reduce</div></div>
+      <div class="card stat frag"><div class="v">Posturas<span class="un">forzadas</span></div><div class="k">Inserción de las últimas unidades en posiciones comprometidas</div></div>
+      <div class="card stat frag"><div class="v">Repetición</div><div class="k">Movimientos repetitivos a lo largo de toda la jornada</div></div>
+    </div>
+    <div class="g2 frag">
+      <div class="card danger">
+        <h3>Consecuencia directa</h3>
+        <p>Desgaste prematuro en la salud del personal y <strong>riesgo concreto de accidente</strong> durante la operación.</p>
+      </div>
+      <div class="card ok">
+        <h3>Propuesta</h3>
+        <p>Sustituir el esfuerzo humano por un <strong>brazo robótico teleoperado</strong>, y entrenar al operario en un <strong>entorno virtual</strong> antes de llevarlo al equipo real.</p>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Combinación de esfuerzo físico + repetitividad + postura forzada. Esa tríada es lo que genera el riesgo ergonómico. La robotización resuelve el esfuerzo; la VR resuelve el entrenamiento.</div>
+</section>
+
+<!-- ============================================================
+     4 · POR QUÉ VR
+     ============================================================ -->
+<section class="slide" data-title="Motivación del entorno VR">
+  <div class="s-head">
+    <div class="kicker">1 &middot; Introducción</div>
+    <h2>¿Por qué entrenar en Realidad Virtual?</h2>
+    <p class="sub">Durante la fase de aprendizaje existe riesgo de colisiones con el rack, caída de vasos y golpes al operador — y la destreza inicial varía mucho entre personas.</p>
+  </div>
+  <div class="body">
+    <div class="g5">
+      <div class="card tint frag"><span class="num">01</span><h3>Sin riesgo</h3><p>Se aprende sobre una réplica virtual: no se daña el equipo ni se lastima el operador.</p></div>
+      <div class="card frag"><span class="num">02</span><h3>Sin costo de error</h3><p>Desaparecen los materiales dañados y las paradas de producción no planificadas.</p></div>
+      <div class="card frag"><span class="num">03</span><h3>Reconfigurable</h3><p>Otras secuencias, cargas o restricciones sin ninguna intervención física.</p></div>
+      <div class="card frag"><span class="num">04</span><h3>Medible</h3><p>Tiempo por tarea, colisiones, operaciones completadas y masa manipulada, instrumentados automáticamente.</p></div>
+      <div class="card tint2 frag"><span class="num">05</span><h3>Transferible</h3><p><strong>El mismo joystick físico</strong> del entrenamiento opera el robot real: los patrones aprendidos se transfieren directo.</p></div>
+    </div>
+    <div class="frag mt26">
+      <div class="card tint2">
+        <p style="font-size:var(--fs-1)"><strong>El punto 05 es la clave del diseño:</strong> no se entrena con un mando genérico y después se cambia de interfaz — se entrena con <em>exactamente</em> el mismo hardware con el que se va a trabajar.</p>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Los cinco beneficios son los que justifican el proyecto. El quinto es el diferencial: la continuidad de la interfaz entre simulación y planta real.</div>
+</section>
+
+<!-- ============================================================
+     5 · OBJETIVOS Y ALCANCE
+     ============================================================ -->
+<section class="slide" data-title="Objetivos y alcance">
+  <div class="s-head">
+    <div class="kicker">2 &middot; Objetivos</div>
+    <h2>Objetivos y alcance del trabajo</h2>
+    <p class="sub">Desarrollar un entorno VR y un esquema de control que permitan <strong>entrenar y luego teleoperar</strong> un brazo robótico mediante un joystick propio, priorizando seguridad, usabilidad y desempeño.</p>
+  </div>
+  <div class="body">
+    <div class="g3 g-stretch">
+      <div class="card tint frag">
+        <span class="num">SOFTWARE</span>
+        <ul class="bul tight sm">
+          <li>Simulador del brazo en <b>Unity</b> con interacción XR</li>
+          <li>Mapeo de los controles del joystick a los <b>GDL del robot</b></li>
+          <li>Mecanismos de seguridad: parada, zonas prohibidas, límites de velocidad</li>
+          <li>Monitoreo externo por <b>UDP</b> en tiempo real</li>
+        </ul>
+      </div>
+      <div class="card tint2 frag">
+        <span class="num">HARDWARE</span>
+        <ul class="bul c2 tight sm">
+          <li>Prototipo funcional del <b>joystick RPi Pico</b></li>
+          <li>Operación como <b>dispositivo HID estándar</b>, sin drivers</li>
+          <li>Capacidad de emitir <b>retroalimentación háptica</b> al operador</li>
+        </ul>
+      </div>
+      <div class="card frag">
+        <span class="num" style="color:var(--dim)">FUERA DE ALCANCE</span>
+        <ul class="bul no tight sm">
+          <li>Háptica proporcional a la fuerza de contacto</li>
+          <li><i>Motion planning</i> autónomo</li>
+          <li>Integración física con el robot electrohidráulico real <span class="tiny">(trabajo futuro)</span></li>
+          <li>Certificación normativa industrial</li>
+        </ul>
+      </div>
+    </div>
+    <div class="frag mt26">
+      <div class="chips">
+        <span class="chip a">Entrenamiento VR de posicionamiento del efector</span>
+        <span class="chip a">Teleoperación por USB con joystick propio</span>
+        <span class="chip b">Capa UDP para clientes externos</span>
+        <span class="chip b">Capa básica de seguridad en simulación</span>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Aclarar bien el límite: <b>no</b> se conecta al robot real en esta versión, y la háptica es binaria (on/off), no proporcional a la fuerza.</div>
+</section>
+
+<!-- ============================================================
+     6 · ARQUITECTURA
+     ============================================================ -->
+<section class="slide" data-title="Arquitectura del sistema">
+  <div class="s-head">
+    <div class="kicker">Visión general</div>
+    <h2>Arquitectura del sistema</h2>
+    <p class="sub">Del potenciómetro del joystick al ángulo articular — y de vuelta al operador por vibración, más una rama de monitoreo hacia clientes externos.</p>
+  </div>
+  <div class="body">
+    <div style="height:470px">
+      <svg class="diag" viewBox="0 0 1280 470" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/>
+          </marker>
+          <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+          </marker>
+          <marker id="ah-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/>
+          </marker>
+        </defs>
+
+        <!-- etiquetas de fila -->
+        <text class="lb-s" x="112" y="121" text-anchor="end">HÁPTICA</text>
+        <text class="lb-s" x="112" y="247" text-anchor="end">CONTROL</text>
+        <text class="lb-s" x="112" y="381" text-anchor="end">MONITOREO</text>
+
+        <!-- ===== cadena principal ===== -->
+        <g class="frag">
+          <rect class="bx-a" x="130" y="210" width="145" height="66" rx="10"/>
+          <text class="ti" x="202" y="238" text-anchor="middle">Joystick</text>
+          <text class="ti-s" x="202" y="257" text-anchor="middle">RP2040 · TinyUSB</text>
+        </g>
+        <g class="frag">
+          <path class="wire flow" d="M275 243 H311" marker-end="url(#ah)"/>
+          <rect class="bx" x="321" y="210" width="145" height="66" rx="10"/>
+          <text class="ti" x="393" y="238" text-anchor="middle">Input System</text>
+          <text class="ti-s" x="393" y="257" text-anchor="middle">gamepad HID</text>
+        </g>
+        <g class="frag">
+          <path class="wire flow" d="M466 243 H502" marker-end="url(#ah)"/>
+          <rect class="bx-a" x="512" y="210" width="145" height="66" rx="10"/>
+          <text class="ti" x="584" y="238" text-anchor="middle">JoystickAdapter</text>
+          <text class="ti-s" x="584" y="257" text-anchor="middle">Δp cartesiano</text>
+        </g>
+        <g class="frag">
+          <path class="wire flow" d="M657 243 H693" marker-end="url(#ah)"/>
+          <rect class="bx" x="703" y="210" width="145" height="66" rx="10"/>
+          <text class="ti" x="775" y="238" text-anchor="middle">IK Flange</text>
+          <text class="ti-s" x="775" y="257" text-anchor="middle">JointTarget</text>
+        </g>
+        <g class="frag">
+          <path class="wire flow" d="M848 243 H884" marker-end="url(#ah)"/>
+          <rect class="bx-a" x="894" y="210" width="145" height="66" rx="10"/>
+          <text class="ti" x="966" y="238" text-anchor="middle">PID + inercia</text>
+          <text class="ti-s" x="966" y="257" text-anchor="middle">τ → q̈ → q̇ → q</text>
+        </g>
+        <g class="frag">
+          <path class="wire flow" d="M1039 243 H1075" marker-end="url(#ah)"/>
+          <rect class="bx" x="1085" y="210" width="145" height="66" rx="10"/>
+          <text class="ti" x="1157" y="238" text-anchor="middle">KUKA KR210</text>
+          <text class="ti-s" x="1157" y="257" text-anchor="middle">SetJoints (grados)</text>
+        </g>
+
+        <!-- ===== lazo háptico ===== -->
+        <g class="frag">
+          <path class="wire-b flow-slow" d="M1157 210 V121 H913" marker-end="url(#ah-b)"/>
+          <rect class="bx-b" x="703" y="94" width="200" height="54" rx="10"/>
+          <text class="ti" x="803" y="116" text-anchor="middle">GripperDistanceSensor</text>
+          <text class="ti-s" x="803" y="134" text-anchor="middle">5 instancias · proximidad</text>
+
+          <path class="wire-b flow-slow" d="M703 121 H640" marker-end="url(#ah-b)"/>
+          <rect class="bx-b" x="420" y="94" width="210" height="54" rx="10"/>
+          <text class="ti" x="525" y="116" text-anchor="middle">VibrationHidOutput</text>
+          <text class="ti-s" x="525" y="134" text-anchor="middle">reporte HID de 2 bytes</text>
+
+          <path class="wire-b flow-slow" d="M420 121 H202 V200" marker-end="url(#ah-b)"/>
+          <text class="lb-s lb-b" x="292" y="110" text-anchor="middle">VIBRACIÓN</text>
+        </g>
+
+        <!-- ===== rama de monitoreo ===== -->
+        <g class="frag">
+          <path class="wire flow-slow" d="M1157 276 V350" marker-end="url(#ah)"/>
+          <rect class="bx-g" x="1010" y="350" width="220" height="54" rx="10"/>
+          <text class="ti" x="1120" y="372" text-anchor="middle">JointStateBroadcaster</text>
+          <text class="ti-s" x="1120" y="390" text-anchor="middle">servidor UDP · suscripciones</text>
+
+          <path class="wire flow" d="M1010 377 H900" marker-end="url(#ah)"/>
+          <text class="lb-s" x="955" y="366" text-anchor="middle">25 Hz</text>
+          <rect class="bx" x="440" y="350" width="460" height="54" rx="10"/>
+          <text class="ti" x="670" y="372" text-anchor="middle">Consola Python · Visor 3D · MATLAB · Dashboard web</text>
+          <text class="ti-s" x="670" y="390" text-anchor="middle">&quot;q1,q2,q3,q4,q5,q6&quot; en grados · red Tailscale</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+  <div class="notes-src">Recorrer el diagrama de izquierda a derecha. <b>Tres lazos:</b> el de control (fila del medio), el háptico (arriba, vuelve al operador) y el de monitoreo (abajo, sale a clientes externos). Todo lo que sigue del informe cae en alguna de estas tres filas.</div>
+</section>
+
+<!-- ============================================================
+     7 · HARDWARE JOYSTICK
+     ============================================================ -->
+<section class="slide" data-title="Hardware: joystick RPi Pico">
+  <div class="s-head">
+    <div class="kicker">3 &middot; Hardware de interfaz</div>
+    <h2>Joystick RPi Pico diseñado ad hoc</h2>
+  </div>
+  <div class="body">
+    <div class="g-5-7">
+      <div>
+        <ul class="bul frag">
+          <li>Controlador de <b>dos ejes analógicos</b> con carcasa ergonómica <b>impresa en 3D</b> en PLA, de forma bimanual para sesiones prolongadas.</li>
+          <li>Núcleo <b>Raspberry Pi Pico</b>: se aprovechan los <b>ADC integrados</b> para leer los potenciómetros de cada eje y la <b>interfaz USB nativa</b> para hablar con el host.</li>
+          <li>Firmware en <b>C/C++</b> sobre el SDK oficial, con <b>TinyUSB</b> implementando el protocolo <b>USB HID</b>.</li>
+        </ul>
+        <div class="frag mt20">
+          <div class="card tint2">
+            <p>Al presentarse como <strong>gamepad estándar</strong>, el sistema operativo y el <em>Input System</em> de Unity lo reconocen <strong>sin drivers ni código de inicialización</strong>. Verificado con <em>Gamepad Tester</em>: el dispositivo se identifica como <code>cafe-4004-Joystick VR</code>.</p>
+          </div>
+        </div>
+        <div class="frag mt20 chips">
+          <span class="chip a">2 ejes analógicos</span>
+          <span class="chip a">Botones</span>
+          <span class="chip b">Motor háptico</span>
+          <span class="chip b">VID/PID 0xCAFE / 0x4004</span>
+        </div>
+      </div>
+      <div class="g2" style="height:520px">
+        <figure class="fig frag">
+          <div class="box"><img src="../Img/joystick_top_inside.jpg" alt="Interior del joystick"></div>
+          <figcaption><b>Interior:</b> RPi Pico sobre placa de prototipado con los módulos analógicos de cada eje.</figcaption>
+        </figure>
+        <figure class="fig frag">
+          <div class="box"><img src="../Img/joystick_top_full.jpg" alt="Exterior del joystick"></div>
+          <figcaption><b>Exterior:</b> carcasa impresa en 3D con los <i>thumbsticks</i> montados.</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Destacar la decisión de diseño: elegir HID estándar en vez de un protocolo serie propio. Eso es lo que elimina el driver y hace que Unity lo vea solo. Estado actual: funcional para todo lo que la aplicación necesita. Pendiente: refinar <i>deadband</i> y filtrado de ruido de los ADC.</div>
+</section>
+
+<!-- ============================================================
+     8 · FIRMWARE / HID BIDIRECCIONAL
+     ============================================================ -->
+<section class="slide" data-title="HID bidireccional">
+  <div class="s-head">
+    <div class="kicker">3 &middot; Hardware de interfaz</div>
+    <h2>El mismo cable lleva la orden y devuelve la sensación</h2>
+    <p class="sub">Además de leer ejes, el firmware <strong>recibe comandos de vibración</strong> desde Unity por la misma interfaz USB HID.</p>
+  </div>
+  <div class="body">
+    <div style="height:300px" class="frag">
+      <svg class="diag" viewBox="0 0 1180 300" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+          </marker>
+          <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/>
+          </marker>
+        </defs>
+        <rect class="bx-a" x="40" y="90" width="230" height="120" rx="12"/>
+        <text class="ti" x="155" y="132" text-anchor="middle" style="font-size:17px">Joystick RP2040</text>
+        <text class="ti-s" x="155" y="156" text-anchor="middle">ADC · botones</text>
+        <text class="ti-s" x="155" y="176" text-anchor="middle">motor háptico</text>
+
+        <rect class="bx-b" x="910" y="90" width="230" height="120" rx="12"/>
+        <text class="ti" x="1025" y="132" text-anchor="middle" style="font-size:17px">Unity</text>
+        <text class="ti-s" x="1025" y="156" text-anchor="middle">Input System</text>
+        <text class="ti-s" x="1025" y="176" text-anchor="middle">VibrationHidOutput</text>
+
+        <path class="wire-a flow" d="M270 128 H900" marker-end="url(#ah2)"/>
+        <text class="lb lb-a" x="585" y="114" text-anchor="middle">IN · ejes analógicos y botones</text>
+        <text class="lb-s" x="585" y="146" text-anchor="middle">reporte HID de entrada · gamepad estándar</text>
+
+        <path class="wire-b flow" d="M900 190 H280" marker-end="url(#ah3)"/>
+        <text class="lb lb-b" x="590" y="222" text-anchor="middle">OUT · comando de vibración</text>
+        <text class="lb-s" x="590" y="246" text-anchor="middle">HidD_SetOutputReport · 2 bytes: [reportID 0x00][motor 0x01/0x00]</text>
+      </svg>
+    </div>
+    <div class="g3 mt26">
+      <div class="card frag"><h3>Escritura HID directa</h3><p>Camino principal: Win32 sobre <code>hid.dll</code> y <code>setupapi.dll</code> — <code>CreateFile</code> / <code>WriteFile</code> / <code>HidD_SetOutputReport</code>, localizando el dispositivo por VID/PID.</p></div>
+      <div class="card frag"><h3>Camino alternativo PS4</h3><p>En paralelo, si hay un <code>DualShockGamepad</code> conectado, se replica el estado del motor como <i>rumble</i> nativo con <code>SetMotorSpeeds</code>.</p></div>
+      <div class="card tint2 frag"><h3>Por qué importa</h3><p>Permite <strong>sustituir el joystick propio por un control PS4</strong> durante sesiones de prueba, sin tener el hardware a mano.</p></div>
+    </div>
+  </div>
+  <div class="notes-src">La vibración avisa al operador que el efector está cerca de un objeto <b>antes</b> del contacto. Es la única realimentación de fuerza del sistema, y es binaria — no proporcional.</div>
+</section>
+
+<!-- ============================================================
+     9 · UNITY + FLANGE
+     ============================================================ -->
+<section class="slide" data-title="Unity + Flange">
+  <div class="s-head">
+    <div class="kicker">4 &middot; Desarrollo en Unity</div>
+    <h2>Unity 6000.3 LTS + paquete Flange</h2>
+  </div>
+  <div class="body">
+    <div class="g-7-5">
+      <figure class="fig frag" style="height:470px">
+        <div class="box fill"><img src="../Img/KUKA_Flange.png" alt="Escena Unity con KUKA KR210"></div>
+        <figcaption>Escena de simulación: <b>KUKA KR210</b> con efector tipo gancho integrado mediante <i>Flange</i>. Al fondo, el rack de ensamble y el resto del entorno industrial virtual.</figcaption>
+      </figure>
+      <div>
+        <ul class="bul frag">
+          <li><b>com.preliy.flange</b> aporta el modelo 3D articulado del <b>KUKA KR210 R3100-2</b>, un solver de <b>cinemática inversa analítica</b> y una interfaz de control desde C#.</li>
+          <li>Evita implementar el cálculo cinemático desde cero.</li>
+          <li>El joystick entra por el <b>Input System</b> mediante un <i>Input Action Asset</i> configurable desde el editor.</li>
+        </ul>
+        <div class="frag mt26">
+          <div class="card tint">
+            <h3>Regla de arquitectura</h3>
+            <p>Flange recibe <strong>ángulos articulares en grados</strong>, no torques físicos de Unity Physics. El brazo <strong>nunca</strong> se mueve por <code>Rigidbody</code>, fuerzas ni impulsos.</p>
+          </div>
+        </div>
+        <div class="frag mt16">
+          <div class="chips">
+            <span class="chip">metros — posición</span>
+            <span class="chip a">grados — Flange</span>
+            <span class="chip b">radianes — ROS</span>
+            <span class="chip">kg·m² — inercia</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">La consistencia de unidades es una regla dura del proyecto: cada capa tiene la suya y las conversiones están en un solo lugar. Si la solución IK es inválida, no se fuerza el movimiento.</div>
+</section>
+
+<!-- ============================================================
+     10 · HUD / CANVAS
+     ============================================================ -->
+<section class="slide" data-title="Interfaz en pantalla (Canvas)">
+  <div class="s-head">
+    <div class="kicker">4.1 &middot; Listado de comandos y Canvas</div>
+    <h2>Todo lo que el operador necesita, en pantalla</h2>
+  </div>
+  <div class="body">
+    <div class="g-4-6">
+      <figure class="fig frag" style="height:520px">
+        <div class="box"><img src="../Img/unity_hud.png" alt="Canvas de la aplicación en ejecución"></div>
+        <figcaption>Panel de interfaz en ejecución, visible durante toda la sesión de entrenamiento.</figcaption>
+      </figure>
+      <div>
+        <div class="card tint tight frag mb10">
+          <span class="num">BLOQUE 1</span>
+          <h3>Acciones de control (PID)</h3>
+          <p>Acción de control en <code>°/s²</code> calculada por el controlador PID de cada articulación <b>J1&ndash;J6</b>, en tiempo real.</p>
+        </div>
+        <div class="card tight frag mb10">
+          <span class="num">BLOQUE 2</span>
+          <h3>Guía de controles</h3>
+          <p>Mapeo de botones y palancas del joystick, siempre a la vista como referencia inmediata del operador.</p>
+        </div>
+        <div class="card tight frag mb10">
+          <span class="num">BLOQUE 3</span>
+          <h3>Métricas de desempeño</h3>
+          <p>Colisiones, tiempo de operación, operaciones completadas y masa agarrada.</p>
+        </div>
+        <div class="card tint2 tight frag">
+          <span class="num">ESQUINA INFERIOR</span>
+          <h3>Cámara del gripper</h3>
+          <p>Sub-ventana con la vista en tiempo real desde una cámara montada sobre el efector, que facilita el <strong>posicionamiento preciso</strong> de la garra sobre las celdas. La lectura grande es la <strong>distancia al objetivo</strong>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">El panel &quot;Clientes conectados&quot; también vive acá — se ve en la captura. Se vuelve sobre él en la sección de comunicación UDP.</div>
+</section>
+
+<!-- ============================================================
+     11 · MAPEO DE COMANDOS
+     ============================================================ -->
+<section class="slide" data-title="Mapeo de comandos y modos">
+  <div class="s-head">
+    <div class="kicker">4.1 &middot; Listado de comandos y Canvas</div>
+    <h2>Dos perfiles de mando, tres modos de operación</h2>
+    <p class="sub">Las acciones se definen en <i>Input Action Assets</i>: <code>RobotBasic.inputactions</code> para el joystick propio VR-2 y <code>PS4Joystick.inputactions</code> para el gamepad PlayStation 4.</p>
+  </div>
+  <div class="body">
+    <div class="g-6-4">
+      <div class="frag">
+        <table class="t sm">
+          <thead><tr><th>Acción</th><th>VR-2 (propio)</th><th>PS4</th><th>Uso</th></tr></thead>
+          <tbody>
+            <tr><td class="k">MoveX / MoveZ</td><td>Palanca principal</td><td>Stick izq.</td><td>Traslación lateral y frontal del <b>TCP</b></td></tr>
+            <tr><td class="k">MoveY</td><td>Palanca de altura</td><td>Stick der. (vert.)</td><td>Traslación vertical del TCP</td></tr>
+            <tr><td class="k">Gripper</td><td>Trigger izq.</td><td>R3</td><td>Clic: abre/cierra &middot; <b>1 s</b>: homing de J6</td></tr>
+            <tr><td class="k">ModoCamara</td><td>Pulsador der.</td><td>L3</td><td>Clic: Robot/Cámara &middot; doble: modo J6 &middot; <b>2 s</b>: pausa</td></tr>
+            <tr><td class="k">J6AntiHor / J6Hor</td><td>gesto circular</td><td>L1 / R1</td><td>Giro de J6 a velocidad constante</td></tr>
+            <tr><td class="k">J6Home</td><td>—</td><td>Cuadrado</td><td>Retorno de J6 a su referencia física</td></tr>
+            <tr><td class="k">Selector / Click</td><td>Palancas + pulsador</td><td>Cruceta + Cruz</td><td>Navegación y confirmación del menú</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="card tint frag mb16">
+          <h3>Modo Robot</h3>
+          <p><code>IsCameraMode = false</code> — los analógicos mueven el <b>Tool Center Point</b> en el espacio cartesiano.</p>
+        </div>
+        <div class="card tint2 frag mb16">
+          <h3>Modo Cámara</h3>
+          <p><code>IsCameraMode = true</code> — los <b>mismos</b> analógicos controlan posición y orientación de la cámara principal, estilo <i>first-person</i>.</p>
+        </div>
+        <div class="card frag mb16">
+          <h3>Modo J6 exclusivo</h3>
+          <p>Doble clic: la muñeca gira aislada, con un límite de velocidad propio de <b>±45 °/s</b>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">El joystick propio tiene menos controles físicos que un PS4, así que varias funciones se resuelven con <b>gestos temporales</b>: clic corto, doble clic, mantener 1 s, mantener 2 s. Ese es el truco para no perder funcionalidad con menos botones.</div>
+</section>
+
+<!-- ============================================================
+     12 · REMAPEO GEOMÉTRICO
+     ============================================================ -->
+<section class="slide" data-title="Remapeo geométrico de direcciones" data-anim="remap">
+  <div class="s-head">
+    <div class="kicker">4.2 &middot; Remapeo geométrico</div>
+    <h2>Que &laquo;adelante&raquo; siempre signifique adelante</h2>
+    <p class="sub">Si el operador navega libremente en modo Cámara y luego retoma el robot, la dirección &laquo;al frente&raquo; del punto de vista ya no coincide con ningún eje del mundo.</p>
+  </div>
+  <div class="body">
+    <div class="g-6-4">
+      <div style="height:430px">
+        <svg class="diag" id="remapSvg" viewBox="0 0 660 430" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <marker id="rm-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+            </marker>
+            <marker id="rm-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/>
+            </marker>
+            <pattern id="rm-grid" width="44" height="44" patternUnits="userSpaceOnUse">
+              <path d="M44 0 H0 V44" fill="none" stroke="var(--line)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect x="30" y="20" width="600" height="390" fill="url(#rm-grid)" stroke="var(--line-2)" rx="8"/>
+          <text class="lb-s" x="44" y="40">PLANO HORIZONTAL XZ DEL MUNDO</text>
+
+          <!-- ejes del mundo (referencia fija) -->
+          <path d="M70 380 H150" stroke="var(--line-2)" stroke-width="1.5"/>
+          <path d="M70 380 V300" stroke="var(--line-2)" stroke-width="1.5"/>
+          <text class="lb-s" x="156" y="384">X mundo</text>
+          <text class="lb-s" x="60" y="294">Z mundo</text>
+
+          <!-- línea de visión -->
+          <line id="rm-los" x1="0" y1="0" x2="0" y2="0" stroke="var(--dim)" stroke-width="1.6" stroke-dasharray="6 6"/>
+
+          <!-- vectores -->
+          <line id="rm-dz" x1="0" y1="0" x2="0" y2="0" stroke="var(--accent-2)" stroke-width="3.4" marker-end="url(#rm-b)"/>
+          <line id="rm-dx" x1="0" y1="0" x2="0" y2="0" stroke="var(--accent)" stroke-width="3.4" marker-end="url(#rm-a)"/>
+          <text id="rm-dzl" class="lb lb-b" x="0" y="0">d̂Z ← MoveZ</text>
+          <text id="rm-dxl" class="lb lb-a" x="0" y="0">d̂X ← MoveX</text>
+
+          <!-- TCP -->
+          <g id="rm-tcp">
+            <rect x="322" y="222" width="20" height="20" rx="3" fill="var(--accent)"/>
+            <text class="lb" x="332" y="262" text-anchor="middle" fill="var(--fg)">TCP (KUKA)</text>
+          </g>
+
+          <!-- cámara -->
+          <g id="rm-cam">
+            <circle cx="0" cy="0" r="11" fill="var(--ok)"/>
+            <text class="lb" x="0" y="-20" text-anchor="middle" fill="var(--fg)">MC (cámara)</text>
+          </g>
+        </svg>
+      </div>
+      <div>
+        <div class="frag">
+          <div class="eq c2 sm">
+            <span class="lbl">Dirección de avance — MoveZ</span>
+            d̂<sub>Z</sub> = (p<sub>TCP</sub> − p<sub>cam</sub>)|<sub>Y=0</sub> ⁄ ‖·‖
+            <span class="note">Vector cámara → TCP, con la componente vertical anulada y normalizado. Signo positivo fijo.</span>
+          </div>
+        </div>
+        <div class="frag mt16">
+          <div class="eq sm">
+            <span class="lbl">Dirección lateral — MoveX</span>
+            d̂<sub>X</sub> = ( d̂<sub>Z</sub> × Ŷ<sub>mundo</sub> ) ⁄ ‖·‖
+            <span class="note">Producto vectorial con el eje +Y del mundo. También con signo positivo fijo.</span>
+          </div>
+        </div>
+        <div class="frag mt20">
+          <div class="card ok">
+            <h3>Resultado</h3>
+            <p>Empujar el analógico <strong>hacia adelante</strong> siempre mueve el TCP en la dirección que apunta hacia él desde la cámara; empujarlo <strong>a la derecha</strong> lo desplaza a su derecha geométrica — con independencia de la orientación del efector o de dónde esté la cámara.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">La animación muestra la cámara orbitando: los dos versores se recalculan solos y siguen apuntando &quot;hacia el robot&quot; y &quot;a su derecha&quot;. Sin esto, el operador tiene que traducir mentalmente entre lo que ve y lo que empuja — que es exactamente el error que causa colisiones.</div>
+</section>
+<!-- ============================================================
+     13 · DE JOYSTICK A CONSIGNA CARTESIANA
+     ============================================================ -->
+<section class="slide" data-title="Del joystick a la consigna cartesiana">
+  <div class="s-head">
+    <div class="kicker">4.3 &middot; Cadena de control</div>
+    <h2>Del joystick a la consigna cartesiana</h2>
+    <p class="sub">En cada <code>FixedUpdate</code>, <code>JoystickAdapter</code> construye el incremento de posición del TCP en espacio mundo.</p>
+  </div>
+  <div class="body">
+    <div class="frag">
+      <div class="pipe">
+        <div class="step"><span class="n">01</span><div class="t">Δp sobre la pose actual</div><div class="d">El incremento se aplica sobre la pose vigente del TCP.</div></div>
+        <div class="step"><span class="n">02</span><div class="t">Solver IK de Flange</div><div class="d">Cinemática inversa analítica → <code>JointTarget</code>.</div></div>
+        <div class="step"><span class="n">03</span><div class="t">¿Solución válida?</div><div class="d">Si <code>IsValid == false</code>, <strong>no se fuerza</strong> el movimiento.</div></div>
+        <div class="step"><span class="n">04</span><div class="t">ApplyPID()</div><div class="d">La consigna articular no se aplica directo: pasa por el PID.</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Punto clave a subrayar: la salida del IK <b>no</b> va directo al robot. Si fuera así, el brazo teletransportaría el efector y se perdería toda sensación de masa. El PID y la inercia son los que dan el comportamiento físico creíble.</div>
+</section>
+
+<!-- ============================================================
+     14 · PID
+     ============================================================ -->
+<section class="slide" data-title="Control PID por articulación">
+  <div class="s-head">
+    <div class="kicker">4.3 &middot; Control PID en articulaciones</div>
+    <h2>Un PID por articulación, con torque virtual</h2>
+  </div>
+  <div class="body">
+    <div class="g-6-4">
+      <div>
+        <div class="frag">
+          <div class="eq">
+            <span class="lbl">Torque virtual por articulación — JointPID</span>
+            τ[k] = <span class="hi">K<sub>p</sub></span> e[k] + <span class="hi">K<sub>i</sub></span> Σ e[k] Δt + <span class="hi">K<sub>d</sub></span> ( q̇<sub>target</sub>[k] − q̇<sub>medida</sub>[k] )
+            <span class="note">El término derivativo <b>no</b> es la derivada clásica del error, sino un <b>error de velocidad</b> entre la velocidad de la consigna IK y la velocidad articular medida.</span>
+          </div>
+        </div>
+        <div class="frag mt20">
+          <ul class="bul tight">
+            <li><code>e[k] = Mathf.DeltaAngle(q<sub>actual</sub>, q<sub>target</sub>)</code></li>
+            <li>Integral saturada en <b>±200 °·s</b> — <i>anti-windup</i></li>
+            <li><code>q̇<sub>medida</sub> = DeltaAngle(q<sub>previo</sub>, q<sub>actual</sub>) / Δt</code></li>
+            <li>Un <b><i>feedforward</i> de velocidad</b> compensa el amortiguamiento viscoso discreto, para que el seguimiento no dependa solo de K<sub>d</sub></li>
+          </ul>
+        </div>
+        <div class="frag mt20">
+          <div class="g4">
+            <div class="card stat acc"><div class="v">10.8</div><div class="k">K<sub>p</sub> base</div></div>
+            <div class="card stat acc"><div class="v">5.03</div><div class="k">K<sub>i</sub> base</div></div>
+            <div class="card stat acc"><div class="v">1.03</div><div class="k">K<sub>d</sub> base</div></div>
+            <div class="card stat acc2"><div class="v">5.39<span class="un">kg·m²</span></div><div class="k">Inercia de referencia</div></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card frag mb16">
+          <span class="num">SATURACIONES DE SEGURIDAD</span>
+          <table class="t sm" style="margin-top:6px">
+            <tbody>
+              <tr><td>Aceleración angular</td><td class="k">±720 °/s²</td></tr>
+              <tr><td>Velocidad articular</td><td class="k">±60 °/s</td></tr>
+              <tr><td>J6 en modo exclusivo</td><td class="k">±45 °/s</td></tr>
+              <tr><td>Amortiguamiento viscoso</td><td class="k">1 s⁻¹</td></tr>
+              <tr><td>Piso de inercia normalizada</td><td class="k">5 %</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card tint frag">
+          <h3>Al alcanzar un límite físico</h3>
+          <p>La posición articular se recorta contra los <strong>límites físicos</strong> de cada eje. Si un límite se alcanza, la velocidad <strong>se frena a cero</strong> y el integrador del PID correspondiente <strong>se reinicia</strong>, para evitar <i>windup</i>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">El piso del 5 % en la inercia normalizada existe para evitar inestabilidad numérica en los eslabones livianos de la muñeca (link_6 pesa 0.5 kg). Sin ese piso, la división por una inercia casi nula dispara la aceleración.</div>
+</section>
+
+<!-- ============================================================
+     15 · INERCIA EFECTIVA
+     ============================================================ -->
+<section class="slide" data-title="Inercia efectiva">
+  <div class="s-head">
+    <div class="kicker">4.3 &middot; Control PID en articulaciones</div>
+    <h2>Inercia efectiva: por qué el brazo &laquo;pesa&raquo;</h2>
+    <p class="sub">El torque del PID se convierte en aceleración angular <strong>ponderada por la inercia efectiva</strong> del eslabón, calculada en <code>RobotDynamics.ComputeEffectiveInertia()</code>.</p>
+  </div>
+  <div class="body">
+    <div class="g-5-7">
+      <div>
+        <div class="frag">
+          <div class="card tint2">
+            <h3>Objeto agarrado como masa puntual</h3>
+            <p>Si el gripper sostiene algo, se suman <code>GrabbedMass</code> y <code>GrabbedWorldPosition</code> a la J<sub>eff</sub> de <strong>cada</strong> articulación, como masa puntual ubicada en el <code>graspPoint</code>.</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="frag">
+          <div class="card">
+            <span class="num">MASAS DEL KUKA KR210 — ARREGLO ESTÁTICO <code>RobotDynamics.Links</code></span>
+            <table class="t sm" style="margin-top:8px">
+              <thead><tr><th>Eslabón</th><th>Masa</th><th style="width:52%">Proporción</th></tr></thead>
+              <tbody>
+                <tr><td class="k">link_1</td><td><b>138 kg</b></td><td><div class="bar"><i style="--w:100%"></i></div></td></tr>
+                <tr><td class="k">link_2</td><td><b>95 kg</b></td><td><div class="bar"><i style="--w:69%"></i></div></td></tr>
+                <tr><td class="k">link_3</td><td><b>71 kg</b></td><td><div class="bar"><i style="--w:51%"></i></div></td></tr>
+                <tr><td class="k">link_4</td><td><b>17 kg</b></td><td><div class="bar"><i style="--w:12%"></i></div></td></tr>
+                <tr><td class="k">link_5</td><td><b>7 kg</b></td><td><div class="bar"><i style="--w:5%"></i></div></td></tr>
+                <tr><td class="k">link_6</td><td><b>0.5 kg</b></td><td><div class="bar"><i style="--w:1.5%"></i></div></td></tr>
+              </tbody>
+            </table>
+            <p class="tiny mt12">Masas y centros de masa tomados del modelo <b>URDF</b> del curso <i>Robotics Nanodegree</i> (RoboND) de Udacity, con cada CoM expresado en el espacio local de su <code>TransformJoint</code>.</p>
+          </div>
+        </div>
+        <div class="frag mt16">
+          <div class="card tint">
+            <p><strong>Efecto en VR:</strong> mover J1 (que arrastra 328 kg de eslabones distales) se siente pesado y lento; mover J6 (0.5 kg) responde al instante. Esa diferencia es lo que hace creíble la simulación.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Este es el mecanismo que traduce &quot;física&quot; a un sistema que <b>no</b> usa Unity Physics para el brazo. La inercia no se simula con Rigidbodies: se calcula analíticamente y se inyecta como ganancia variable del PID.</div>
+</section>
+
+<!-- ============================================================
+     16 · SEGURIDAD
+     ============================================================ -->
+<section class="slide" data-title="Capas de seguridad" data-anim="safety">
+  <div class="s-head">
+    <div class="kicker">4.3 &middot; Asistencias de seguridad</div>
+    <h2>Tres capas independientes contra la colisión</h2>
+  </div>
+  <div class="body">
+    <div class="g-6-4">
+      <div style="height:430px">
+        <svg class="diag" id="safetySvg" viewBox="0 0 720 430" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="sf-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" stop-opacity="0"/>
+              <stop offset="100%" stop-color="var(--accent)" stop-opacity=".22"/>
+            </linearGradient>
+          </defs>
+
+          <!-- zona de frenado -->
+          <rect x="60" y="215" width="380" height="125" fill="url(#sf-grad)"/>
+
+          <!-- superficie -->
+          <rect x="40" y="360" width="420" height="18" rx="3" fill="var(--panel-2)" stroke="var(--line-2)"/>
+          <text class="lb-s" x="250" y="398" text-anchor="middle">SUPERFICIE / OBSTÁCULO DEL ENTORNO</text>
+
+          <!-- umbral 30 cm -->
+          <line x1="60" y1="215" x2="440" y2="215" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="7 6"/>
+          <text class="lb lb-a" x="450" y="206">30 cm</text>
+          <text class="lb-s" x="450" y="222">frenado progresivo</text>
+
+          <!-- margen 5 cm -->
+          <line x1="60" y1="336" x2="440" y2="336" stroke="var(--danger)" stroke-width="2"/>
+          <text class="lb" x="450" y="330" fill="var(--danger)">5 cm</text>
+          <text class="lb-s" x="450" y="346">bloqueo de descenso</text>
+
+          <!-- gripper -->
+          <g id="sf-grip">
+            <rect x="205" y="20" width="90" height="42" rx="6" fill="var(--accent-2-soft)" stroke="var(--accent-2)" stroke-width="1.6"/>
+            <rect x="212" y="62" width="12" height="34" rx="3" fill="var(--accent-2)"/>
+            <rect x="276" y="62" width="12" height="34" rx="3" fill="var(--accent-2)"/>
+            <text class="lb" x="250" y="46" text-anchor="middle" fill="var(--fg)">GRIPPER</text>
+          </g>
+
+          <!-- rayo del sensor inferior -->
+          <line id="sf-ray" x1="250" y1="96" x2="250" y2="360" stroke="var(--accent-2)" stroke-width="1.4" stroke-dasharray="4 5" opacity=".65"/>
+
+          <!-- lectura de distancia -->
+          <text id="sf-dist" class="lb" x="308" y="110" fill="var(--accent-2)" style="font-size:15px">0.00 m</text>
+
+          <!-- barra de velocidad -->
+          <rect x="656" y="60" width="26" height="300" rx="6" fill="var(--track)" stroke="var(--line)"/>
+          <rect id="sf-speed" x="659" y="63" width="20" height="294" rx="5" fill="var(--ok)"/>
+          <!-- piso teórico del 50 %: solo se alcanzaría a distancia nula, que el bloqueo de descenso impide -->
+          <line x1="650" y1="210" x2="688" y2="210" stroke="var(--danger)" stroke-width="1.4" stroke-dasharray="4 4"/>
+          <text class="lb-s" x="644" y="214" text-anchor="end" fill="var(--danger)">piso 50%</text>
+          <text class="lb-s" x="669" y="46" text-anchor="middle">λ prox</text>
+          <text id="sf-speedtxt" class="lb" x="669" y="382" text-anchor="middle" fill="var(--fg)" style="font-size:13px">100%</text>
+        </svg>
+      </div>
+      <div>
+        <div class="card tint tight frag mb10">
+          <span class="num">CAPA 1</span>
+          <h3>Frenado por proximidad</h3>
+          <p>A medida que la distancia cae bajo <code>ThresholdMeters</code> (<b>30 cm</b>), la velocidad cartesiana se interpola linealmente hasta un piso de <b>50 %</b> — <strong>en cualquier dirección</strong>, y sin llegar nunca a cero.</p>
+        </div>
+        <div class="card danger tight frag mb10">
+          <span class="num" style="color:var(--danger)">CAPA 2</span>
+          <h3>Bloqueo de descenso</h3>
+          <p><code>ApplyDescentLimit()</code> — bloqueo estricto que <strong>solo</strong> actúa al descender con la garra cerrada: recorta el paso vertical al margen restante (<b>5 cm</b>), deteniendo el descenso justo <em>sobre</em> la superficie.</p>
+        </div>
+        <div class="card tint2 tight frag mb10">
+          <span class="num">CAPA 3</span>
+          <h3>Veto anticolisión</h3>
+          <p><code>ApplyCollisionVeto()</code> traza un <code>SphereCastNonAlloc</code> desde el efector a lo largo de la dirección de movimiento contra el <i>layer</i> <b>Entorno</b>, y recorta el paso antes del contacto. Ignora el propio robot, la pieza agarrada y las superficies muy horizontales.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Por qué el veto ignora superficies horizontales: si no, el operador no podría bajar a recoger una pieza apoyada en una mesa. Esa exclusión es deliberada, no un descuido. Requiere haber corrido <code>Tools &gt; Entorno &gt; Generar colliders faltantes</code>; sin ese paso el veto queda sin efecto.</div>
+</section>
+
+<!-- ============================================================
+     17 · GRIPPER
+     ============================================================ -->
+<section class="slide" data-title="Gripper: lógica de agarre">
+  <div class="s-head">
+    <div class="kicker">4.4 &middot; Movimiento del gripper</div>
+    <h2>Agarrar de verdad, no pegar por <i>tag</i></h2>
+    <p class="sub">La apertura y cierre del OnRobot RG2 se controla con un único botón, gestionado por <code>Ctrl_OnRobotRG2_Custom</code>.</p>
+  </div>
+  <div class="body">
+    <div class="g-6-4">
+      <div class="frag">
+        <div class="pipe">
+          <div class="step"><span class="n">GRAB</span><div class="t">Guarda la masa original</div><div class="d">Se registra la masa del <code>Rigidbody</code> del objeto.</div></div>
+          <div class="step"><span class="n">GRAB</span><div class="t">Suma masa al gripper</div><div class="d">La masa se transfiere al <code>Rigidbody</code> del gripper.</div></div>
+          <div class="step"><span class="n">GRAB</span><div class="t">Cinemático + emparentado</div><div class="d">El objeto pasa a cinemático y se emparenta al <code>graspPoint</code>: movimiento 1:1 sin deslizamientos.</div></div>
+        </div>
+      </div>
+      <div class="card ok frag">
+        <h3>Al soltar</h3>
+        <p>Se restauran masa y físicas. <code>MoveGrabbedObjectToSafeReleaseHeight()</code> corrige la posición si la suelta ocurriera por debajo del piso o de la altura mínima de recogida.</p>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">El diseño de agarre por doble contacto + ventana de cierre es lo que evita el clásico bug de simulador donde el objeto se te pega solo con rozarlo. Es más trabajo, pero es lo que hace que el entrenamiento enseñe a agarrar bien.</div>
+</section>
+
+<!-- ============================================================
+     18 · SENSORES Y HÁPTICA
+     ============================================================ -->
+<section class="slide" data-title="Sensores de distancia y háptica">
+  <div class="s-head">
+    <div class="kicker">4.4 &middot; Realimentación háptica</div>
+    <h2>Cinco sensores, dos roles distintos</h2>
+  </div>
+  <div class="body">
+    <div class="g2 mb20">
+      <div class="card tint2 frag">
+        <span class="num">×1 — SENSOR INFERIOR</span>
+        <h3>Modo <i>Sphere Cast</i></h3>
+        <p>Un rayo con grosor de <b>0.01 m</b> trazado sobre un único eje. Exige una lectura <strong>puntual y precisa</strong> justo debajo del gripper.</p>
+        <ul class="bul c2 tight sm mt12">
+          <li>Único que alimenta el <b>HUD de agarre seguro</b> (<code>IsGripDistanceSafe</code>, entre <b>0.01 y 0.05 m</b>)</li>
+          <li>Único que alimenta el <b>frenado por proximidad</b> del brazo</li>
+        </ul>
+      </div>
+      <div class="card frag">
+        <span class="num">×4 — SENSORES LATERALES</span>
+        <h3>Modo <i>Cono</i></h3>
+        <p><code>Sensor_Distancia_Derecho / Izquierdo / Frontal / Trasero</code>. Muestreo con <code>Physics.OverlapSphereNonAlloc</code> que <strong>promedia sobre un área</strong> en lugar de un único punto.</p>
+        <div class="chips mt12">
+          <span class="chip">8 muestras</span><span class="chip">22.5° de semiángulo</span><span class="chip">hasta 0.4 m</span>
+        </div>
+        <p class="tiny mt12">No participan del frenado ni del HUD. Su única función es <strong>disparar el motor háptico</strong> ante un obstáculo cercano en su dirección, como aviso temprano de <b>colisión lateral</b> durante el traslado del TCP.</p>
+      </div>
+    </div>
+    <div class="card tint frag">
+      <span class="num">ACTIVACIÓN DE LA VIBRACIÓN — CON HISTÉRESIS</span>
+      <div class="rowc mt12" style="gap:26px">
+        <div class="stat acc"><div class="v">0.15<span class="un">m</span></div><div class="k">Se enciende por debajo de <code>vibrationStartDistance</code></div></div>
+        <div style="font-size:var(--fs-3);color:var(--dim)">&rarr;</div>
+        <div class="stat"><div class="v">0.18<span class="un">m</span></div><div class="k">Se apaga recién al superar este umbral</div></div>
+      </div>
+      <p class="tiny mt16">La histéresis evita el parpadeo del motor cuando la distancia oscila alrededor del umbral. Los <strong>cinco sensores actúan de forma independiente</strong>: cualquiera puede activar la vibración vía <code>JoystickVibrationHidOutput.SetMotor(true)</code>. Solo opera cuando <strong>no hay ningún objeto agarrado</strong>.</p>
+    </div>
+  </div>
+  <div class="notes-src">La cámara del gripper (<code>GripperTopCameraFollow</code>) complementa esto: sigue al efector desde arriba, mirando siempre hacia abajo, con el vector <i>up</i> proyectado desde el <i>forward</i> del efector — así la vista gira solidariamente con J6.</div>
+</section>
+
+<!-- ============================================================
+     19 · UDP
+     ============================================================ -->
+<section class="slide" data-title="Comunicación UDP servidor-cliente">
+  <div class="s-head">
+    <div class="kicker">4.5 &middot; Comunicación UDP</div>
+    <h2>Servidor UDP con suscripción dinámica</h2>
+    <p class="sub">A diferencia de un esquema de destino fijo, Unity mantiene una <strong>lista de suscriptores activos</strong>: cualquier cliente que envíe <code>&quot;HELLO&quot;</code> queda registrado y empieza a recibir el estado articular.</p>
+  </div>
+  <div class="body">
+    <div style="height:376px" class="frag">
+      <svg class="diag" viewBox="0 0 1180 376" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="ud-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ok)"/>
+          </marker>
+          <marker id="ud-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)"/>
+          </marker>
+          <path id="ud-p0" d="M330 120 H700"/>
+          <path id="ud-p1" d="M330 152 H700"/>
+          <path id="ud-p2" d="M330 224 H700"/>
+          <path id="ud-p3" d="M330 256 H700"/>
+        </defs>
+
+        <!-- servidor -->
+        <rect class="bx-a" x="40" y="88" width="290" height="200" rx="12"/>
+        <text class="ti" x="185" y="122" text-anchor="middle" style="font-size:17px">Unity — JointStateBroadcaster</text>
+        <text class="ti-s" x="185" y="146" text-anchor="middle">servidor UDP</text>
+        <line x1="66" y1="162" x2="304" y2="162" stroke="var(--line)"/>
+        <text class="lb-s" x="66" y="184">SUSCRIPTORES ACTIVOS</text>
+        <text class="lb" x="66" y="208" fill="var(--ok)">100.x.x.11 · consola</text>
+        <text class="lb" x="66" y="230" fill="var(--ok)">100.x.x.12 · visor 3D</text>
+        <text class="lb" x="66" y="252" fill="var(--ok)">100.x.x.13 · MATLAB</text>
+        <text class="lb" x="66" y="274" fill="var(--ok)">100.x.x.21 · celular</text>
+
+        <!-- clientes -->
+        <rect class="bx-b" x="700" y="96" width="240" height="52" rx="10"/>
+        <text class="ti" x="820" y="128" text-anchor="middle">Consola Python</text>
+        <rect class="bx-b" x="700" y="160" width="240" height="52" rx="10"/>
+        <text class="ti" x="820" y="192" text-anchor="middle">Visor 3D Python</text>
+        <rect class="bx-b" x="700" y="224" width="240" height="52" rx="10"/>
+        <text class="ti" x="820" y="256" text-anchor="middle">MATLAB</text>
+        <rect class="bx-b" x="700" y="288" width="240" height="52" rx="10"/>
+        <text class="ti" x="820" y="320" text-anchor="middle">Dashboard web</text>
+
+        <!-- HELLO (cliente -> servidor) -->
+        <path class="wire flow-slow" d="M700 186 H340" stroke="var(--ok)" opacity=".55" marker-end="url(#ud-a)"/>
+        <text class="lb-s" x="520" y="178" text-anchor="middle" fill="var(--ok)">&quot;HELLO&quot; · suscripción + keep-alive cada 5 s</text>
+
+        <!-- datos (servidor -> clientes) -->
+        <path class="wire-b" d="M330 122 H700" marker-end="url(#ud-b)" opacity=".5"/>
+        <path class="wire-b" d="M330 154 H700" marker-end="url(#ud-b)" opacity=".5"/>
+        <path class="wire-b" d="M330 226 H700" marker-end="url(#ud-b)" opacity=".5"/>
+        <path class="wire-b" d="M330 258 H700" marker-end="url(#ud-b)" opacity=".5"/>
+
+        <circle r="4.5" fill="var(--accent-2)"><animateMotion dur="1.4s" repeatCount="indefinite" path="M330 122 H700"/></circle>
+        <circle r="4.5" fill="var(--accent-2)"><animateMotion dur="1.4s" begin="0.35s" repeatCount="indefinite" path="M330 154 H700"/></circle>
+        <circle r="4.5" fill="var(--accent-2)"><animateMotion dur="1.4s" begin="0.7s" repeatCount="indefinite" path="M330 226 H700"/></circle>
+        <circle r="4.5" fill="var(--accent-2)"><animateMotion dur="1.4s" begin="1.05s" repeatCount="indefinite" path="M330 258 H700"/></circle>
+
+        <text class="lb lb-b" x="515" y="112" text-anchor="middle">25 Hz &nbsp;·&nbsp; &quot;q1,q2,q3,q4,q5,q6&quot; en grados</text>
+
+        <!-- red -->
+        <rect x="985" y="96" width="160" height="244" rx="12" fill="var(--violet-soft)" stroke="var(--violet-border)" stroke-width="1.3"/>
+        <text class="ti" x="1065" y="200" text-anchor="middle" fill="var(--violet)">Red Tailscale</text>
+        <text class="ti-s" x="1065" y="222" text-anchor="middle">VPN entre PC, MATLAB y teléfono</text>
+      </svg>
+    </div>
+    <div class="g2 mt20">
+      <div class="card frag"><h3>Múltiples clientes, cero reconfiguración</h3><p>Python, MATLAB y un dashboard web operan <strong>simultáneamente</strong> sin tocar el servidor.</p></div>
+      <div class="card frag"><h3>Limpieza opcional</h3><p><code>_autoCleanupEnabled</code> (desactivado por defecto) elimina suscriptores tras <b>15 s</b> sin <i>keep-alive</i>.</p></div>
+    </div>
+  </div>
+  <div class="notes-src">El detalle de <code>InvariantCulture</code> parece menor pero es el clásico bug que rompe la interoperabilidad: en configuración regional española, un float se serializa con coma y el parser del cliente lo corta mal. El HUD tiene un panel &quot;Clientes conectados&quot; que lista las IPs suscriptas en vivo.</div>
+</section>
+
+<!-- ============================================================
+     20 · CLIENTES
+     ============================================================ -->
+<section class="slide" data-title="Clientes de referencia">
+  <div class="s-head">
+    <div class="kicker">4.5 &middot; Comunicación UDP</div>
+    <h2>Cuatro clientes de referencia</h2>
+    <p class="sub">Comparten el mismo protocolo de suscripción y reutilizan la <strong>misma tabla de parámetros DH</strong> y la misma fórmula de calibración mecánica (<code>JointConfig.Offset / Factor</code>).</p>
+  </div>
+  <div class="body">
+    <div class="g4" style="align-items:stretch">
+      <div class="frag" style="display:flex;flex-direction:column;gap:12px">
+        <div class="card" style="flex:0 0 auto">
+          <span class="num">01</span>
+          <h3>Consola</h3>
+          <p class="tiny"><code>udp_joint_receiver.py</code> — pide IP y puerto, envía el <code>HELLO</code> inicial y mantiene un hilo de <i>keep-alive</i> cada 5 s. Valida que cada paquete traiga exactamente 6 campos numéricos.</p>
+        </div>
+      </div>
+      <figure class="fig frag">
+        <div class="box"><img src="../Img/client_python.png" alt="Visor 3D Python"></div>
+        <figcaption><b>02 · Visor 3D Python</b> — <code>udp_robot_viewer.py</code> con <i>Robotics Toolbox</i> (backend <code>pyplot</code>).</figcaption>
+      </figure>
+      <figure class="fig frag">
+        <div class="box"><img src="../Img/matlab_robot.png" alt="Réplica en MATLAB"></div>
+        <figcaption><b>03 · MATLAB</b> — <code>robot_udp_plot.m</code> anima el KR210 con <code>SerialLink</code> de Peter Corke.</figcaption>
+      </figure>
+      <figure class="fig frag">
+        <div class="box"><img src="../Img/dashboard_pc.png" alt="Dashboard web"></div>
+        <figcaption><b>04 · Dashboard web</b> — servidor HTTP embebido, <i>gauges</i> J1&ndash;J6 y vista 3D interactiva.</figcaption>
+      </figure>
+    </div>
+  </div>
+  <div class="notes-src">Si hay tiempo, mostrar el dashboard en el celular — es el que más impresiona en vivo. Los cuatro clientes corriendo a la vez es la demostración de que la arquitectura de suscripción funciona.</div>
+</section>
+
+<!-- ============================================================
+     21 · MÉTRICAS
+     ============================================================ -->
+<section class="slide" data-title="Métricas de desempeño">
+  <div class="s-head">
+    <div class="kicker">4.1 &middot; Métricas de desempeño</div>
+    <h2>Los indicadores objetivos, instrumentados</h2>
+    <p class="sub">El objetivo declarado en la introducción &mdash;evaluar el desempeño con indicadores objetivos&mdash; se cierra acá.</p>
+  </div>
+  <div class="body">
+    <div class="g4 mb20">
+      <div class="card stat acc frag"><div class="v">Colisiones</div><div class="k">Contactos del gripper contra objetos no agarrables</div></div>
+      <div class="card stat acc2 frag"><div class="v">Tiempo</div><div class="k">Duración de cada operación de agarre&ndash;suelta</div></div>
+      <div class="card stat frag"><div class="v">Operaciones</div><div class="k">Cantidad de ciclos completados</div></div>
+      <div class="card stat frag"><div class="v">Masa</div><div class="k">Masa del objeto sostenido, reportada en vivo</div></div>
+    </div>
+    <figure class="fig frag" style="height:420px;max-width:460px;margin:0 auto">
+      <div class="box"><img src="../Img/codigo/Metricas/4.1-metrics-canvas-hud.png" alt="Bloque de métricas en el HUD"></div>
+      <figcaption class="center">Bloque <b>Métricas de Desempeño</b> del Canvas.</figcaption>
+    </figure>
+  </div>
+  <div class="notes-src">Los cuatro valores se muestran en <code>PerformanceMetricsPanel</code>, con el mismo patrón de clonado de fila plantilla que usan los paneles de Acciones de Control y Guía de Controles.</div>
+</section>
+
+<!-- ============================================================
+     22 · CONCLUSIONES
+     ============================================================ -->
+<section class="slide" data-title="Conclusiones">
+  <div class="s-head">
+    <div class="kicker">Cierre</div>
+    <h2>Conclusiones</h2>
+  </div>
+  <div class="body">
+    <div class="g3 mb26">
+      <div class="card ok frag">
+        <span class="num" style="color:var(--ok)">LOGRADO</span>
+        <ul class="bul check tight sm">
+          <li>Entorno VR funcional de entrenamiento sobre <b>Unity + Flange</b></li>
+          <li><b>Joystick propio</b> operativo como HID estándar, con háptica</li>
+          <li>Cadena de control completa: remapeo → IK → PID → inercia</li>
+          <li><b>Tres capas de seguridad</b> independientes contra colisión</li>
+          <li>Servidor UDP con <b>cuatro clientes</b> simultáneos</li>
+          <li><b>Métricas objetivas</b> instrumentadas en vivo</li>
+        </ul>
+      </div>
+      <div class="card tint frag">
+        <span class="num">APRENDIZAJES</span>
+        <ul class="bul tight sm">
+          <li>Elegir <b>HID estándar</b> eliminó toda la capa de drivers e integración</li>
+          <li>El realismo no vino de Unity Physics, sino de <b>modelar la inercia</b> y meterla en el lazo de control</li>
+          <li>El remapeo geométrico resolvió un problema de <b>usabilidad</b>, no de cinemática</li>
+          <li>La suscripción dinámica hizo el monitoreo <b>extensible sin tocar el servidor</b></li>
+        </ul>
+      </div>
+      <div class="card tint2 frag">
+        <span class="num">TRABAJO FUTURO</span>
+        <ul class="bul c2 tight sm">
+          <li>Háptica <b>proporcional</b> a la fuerza de contacto</li>
+          <li><i>Motion planning</i> autónomo</li>
+          <li>Integración física con el <b>robot electrohidráulico real</b></li>
+          <li>Refinamiento de <i>deadband</i> y filtrado de ruido en los ADC</li>
+          <li>Mejoras ergonómicas sobre la carcasa</li>
+        </ul>
+      </div>
+    </div>
+    <div class="frag">
+      <div class="card tint" style="padding:26px 30px">
+        <p style="font-size:var(--fs-1);line-height:1.5">El sistema cumple el objetivo planteado: un operario puede <strong>aprender a teleoperar el manipulador sin riesgo</strong>, con el mismo mando que usará en planta, y su desempeño puede <strong>medirse objetivamente</strong> durante todo el entrenamiento.</p>
+      </div>
+    </div>
+  </div>
+  <div class="notes-src">Cerrar volviendo al problema de AUTOELEC: el operario que hoy levanta 100 kg a mano. Ese es el destinatario de todo esto.</div>
+</section>
+
+<!-- ============================================================
+     24 · CIERRE
+     ============================================================ -->
+<section class="slide title-slide" data-title="Gracias">
+  <div class="title-bg"><img src="../Img/KUKA_Flange.png" alt=""></div>
+  <div class="title-veil"></div>
+  <div class="title-grid"></div>
+  <div class="title-inner">
+    <img class="title-logo" src="../Img/logo_fing_uncu.png" alt="UNCuyo · Facultad de Ingeniería">
+    <h1 style="font-size:var(--fs-7)">Gracias.</h1>
+    <div class="title-rule"></div>
+    <p style="font-size:var(--fs-1);max-width:760px">Entrenamiento en entorno virtual para la teleoperación segura de brazos robóticos</p>
+    <div class="title-people mt34">
+      <div class="grp">
+        <div class="lbl">Alumnos</div>
+        <div class="nm">Quiroga, Juan Ignacio &middot; Castel, Francisco</div>
+      </div>
+      <div class="grp">
+        <div class="lbl">Cátedra</div>
+        <div class="nm">Realidad Virtual &middot; Ing. Mecatrónica &middot; UNCuyo</div>
+      </div>
+    </div>
+  </div>
+  <div class="title-year">2026</div>
+  <div class="notes-src">Preguntas.</div>
+</section>
+</div><!-- /#stage -->
+
+<div id="hud">
+  <span class="n"><b id="hN">1</b> / <span id="hT">24</span></span>
+  <span class="dot"></span>
+  <span class="sec" id="hSec">Portada</span>
+  <span class="dot"></span>
+  <span id="hClock">00:00</span>
+  <span class="dot"></span>
+  <kbd>?</kbd>
+</div>
+
+<div id="notes"></div>
+
+<div id="overview">
+  <div id="ovHead">
+    <h3>Vista general</h3>
+    <span>Clic en una diapositiva para saltar &middot; Esc para volver</span>
+  </div>
+  <div id="ovGrid"></div>
+</div>
+
+<div id="help">
+  <div class="panel">
+    <h3>Atajos de teclado</h3>
+    <dl>
+      <dt>&rarr; &nbsp;&darr; &nbsp;Espacio &nbsp;PageDown</dt><dd>Diapositiva siguiente</dd>
+      <dt>&larr; &nbsp;&uarr; &nbsp;PageUp</dt><dd>Diapositiva anterior</dd>
+      <dt>N &nbsp;/ &nbsp;P</dt><dd>Diapositiva siguiente / anterior</dd>
+      <dt>Inicio &nbsp;/ &nbsp;Fin</dt><dd>Primera / última diapositiva</dd>
+      <dt>1&hellip;9</dt><dd>Saltar a esa diapositiva</dd>
+      <dt>O &nbsp;/ &nbsp;Esc</dt><dd>Vista general de todas las diapositivas</dd>
+      <dt>S</dt><dd>Notas del orador</dd>
+      <dt>F</dt><dd>Pantalla completa</dd>
+      <dt>T</dt><dd>Reiniciar el cronómetro</dd>
+      <dt>Clic en una imagen</dt><dd>Ampliar a pantalla completa</dd>
+      <dt>?</dt><dd>Mostrar u ocultar esta ayuda</dd>
+    </dl>
+    <div class="foot">Presentación autónoma: funciona sin conexión, con las imágenes tomadas de <code>../Img/</code>.</div>
+  </div>
+</div>
+
+<div id="lb"><img id="lbImg" alt=""><div id="lbCap"></div></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var stage  = document.getElementById('stage');
+  var slides = Array.prototype.slice.call(stage.querySelectorAll('.slide'));
+  var prog   = document.getElementById('prog');
+  var hN     = document.getElementById('hN');
+  var hT     = document.getElementById('hT');
+  var hSec   = document.getElementById('hSec');
+  var hClock = document.getElementById('hClock');
+  var notes  = document.getElementById('notes');
+  var ovGrid = document.getElementById('ovGrid');
+  var lb     = document.getElementById('lb');
+  var lbImg  = document.getElementById('lbImg');
+  var lbCap  = document.getElementById('lbCap');
+  var body   = document.body;
+
+  var cur = 0, step = 0, fragsOf = [];
+
+  slides.forEach(function(s){
+    fragsOf.push(Array.prototype.slice.call(s.querySelectorAll('.frag')));
+  });
+  hT.textContent = slides.length;
+
+  /* ---------- escalado del escenario ---------- */
+  function fit(){
+    var w = window.innerWidth  || document.documentElement.clientWidth  || 1600;
+    var h = window.innerHeight || document.documentElement.clientHeight || 900;
+    var s = Math.max(Math.min(w / 1600, h / 900), 0.05);
+    stage.style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---------- cronómetro ---------- */
+  var t0 = null;
+  function tick(){
+    if (t0 === null){ hClock.textContent = '00:00'; return; }
+    var e = Math.floor((Date.now() - t0) / 1000);
+    var m = Math.floor(e / 60), s = e % 60;
+    hClock.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  setInterval(tick, 1000);
+
+  /* ---------- animaciones por diapositiva ---------- */
+  var raf = null;
+  var animators = {};
+
+  /* Remapeo geométrico: la cámara orbita y los versores se recalculan */
+  animators.remap = function(){
+    var svg = document.getElementById('remapSvg');
+    if (!svg) return null;
+    var cam  = svg.querySelector('#rm-cam');
+    var los  = svg.querySelector('#rm-los');
+    var dz   = svg.querySelector('#rm-dz');
+    var dx   = svg.querySelector('#rm-dx');
+    var dzl  = svg.querySelector('#rm-dzl');
+    var dxl  = svg.querySelector('#rm-dxl');
+    var TX = 332, TY = 232, R = 152, L = 104;
+    var th = Math.PI * 0.62, t0a = null;
+
+    return function frame(ts){
+      if (t0a === null) t0a = ts;
+      th = Math.PI * 0.62 + (ts - t0a) / 26000 * Math.PI * 2;
+
+      var cx = TX + R * Math.cos(th);
+      var cy = TY + R * Math.sin(th);
+      cam.setAttribute('transform', 'translate(' + cx.toFixed(1) + ',' + cy.toFixed(1) + ')');
+
+      los.setAttribute('x1', cx.toFixed(1)); los.setAttribute('y1', cy.toFixed(1));
+      los.setAttribute('x2', TX);            los.setAttribute('y2', TY);
+
+      /* d̂Z = normalizado(TCP - cámara), en el plano horizontal */
+      var sx = -Math.cos(th), sy = -Math.sin(th);
+      var zx = TX + L * sx, zy = TY + L * sy;
+      dz.setAttribute('x1', TX); dz.setAttribute('y1', TY);
+      dz.setAttribute('x2', zx.toFixed(1)); dz.setAttribute('y2', zy.toFixed(1));
+
+      /* d̂X = Ŷmundo × d̂Z  →  perpendicular en el plano horizontal */
+      var px = -sy, py = sx;
+      var xx = TX + L * px, xy = TY + L * py;
+      dx.setAttribute('x1', TX); dx.setAttribute('y1', TY);
+      dx.setAttribute('x2', xx.toFixed(1)); dx.setAttribute('y2', xy.toFixed(1));
+
+      dzl.setAttribute('x', (zx + sx * 26).toFixed(1));
+      dzl.setAttribute('y', (zy + sy * 26 + 4).toFixed(1));
+      dzl.setAttribute('text-anchor', sx < -0.25 ? 'end' : (sx > 0.25 ? 'start' : 'middle'));
+      dxl.setAttribute('x', (xx + px * 26).toFixed(1));
+      dxl.setAttribute('y', (xy + py * 26 + 4).toFixed(1));
+      dxl.setAttribute('text-anchor', px < -0.25 ? 'end' : (px > 0.25 ? 'start' : 'middle'));
+    };
+  };
+
+  /* Capas de seguridad: descenso frenado por proximidad y bloqueo a 5 cm */
+  animators.safety = function(){
+    var svg = document.getElementById('safetySvg');
+    if (!svg) return null;
+    var grip  = svg.querySelector('#sf-grip');
+    var ray   = svg.querySelector('#sf-ray');
+    var dist  = svg.querySelector('#sf-dist');
+    var speed = svg.querySelector('#sf-speed');
+    var stxt  = svg.querySelector('#sf-speedtxt');
+
+    var TY_MAX = 240;          /* recorrido hasta el margen de 5 cm */
+    var M_PER_PX = 0.30 / 145; /* 145 px equivalen al umbral de 30 cm */
+    var ty = 0, hold = 0, last = null;
+
+    return function frame(ts){
+      if (last === null) last = ts;
+      var dt = Math.min((ts - last) / 1000, 0.05);
+      last = ts;
+
+      var distPx = 264 - ty;
+      var d = distPx * M_PER_PX;
+      var lam = 0.5 + 0.5 * Math.max(0, Math.min(1, d / 0.30));
+
+      if (ty >= TY_MAX){
+        hold += dt;
+        if (hold > 1.6){ ty = 0; hold = 0; }
+      } else {
+        ty = Math.min(TY_MAX, ty + 96 * lam * dt);
+      }
+
+      grip.setAttribute('transform', 'translate(0,' + ty.toFixed(1) + ')');
+      ray.setAttribute('y1', (96 + ty).toFixed(1));
+      dist.setAttribute('y', (100 + ty).toFixed(1));
+      dist.textContent = d.toFixed(2) + ' m';
+
+      var h = 294 * lam;
+      speed.setAttribute('height', h.toFixed(1));
+      speed.setAttribute('y', (63 + 294 - h).toFixed(1));
+      speed.setAttribute('fill', lam > 0.92 ? 'var(--ok)' : (lam > 0.68 ? 'var(--warn)' : 'var(--danger)'));
+      stxt.textContent = Math.round(lam * 100) + '%';
+      dist.setAttribute('fill', ty >= TY_MAX ? 'var(--danger)' : 'var(--accent-2)');
+    };
+  };
+
+  function startAnim(slide){
+    stopAnim();
+    var key = slide.getAttribute('data-anim');
+    if (!key || !animators[key]) return;
+    var frame = animators[key]();
+    if (!frame) return;
+    /* Primer cuadro sincrónico: si requestAnimationFrame estuviera pausado
+       (ventana en segundo plano, pestaña oculta), el diagrama igual se ve. */
+    frame(performance.now());
+    var loop = function(ts){ frame(ts); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+  }
+  function stopAnim(){
+    if (raf !== null){ cancelAnimationFrame(raf); raf = null; }
+  }
+
+  /* ---------- render ----------
+     Cada diapositiva se muestra completa al entrar: todos los .frag
+     quedan visibles de una, sin necesidad de pulsar -> varias veces. */
+  function applyFrags(){
+    fragsOf[cur].forEach(function(f){ f.classList.add('on'); });
+  }
+
+  function render(){
+    slides.forEach(function(s, i){
+      s.classList.toggle('is-active', i === cur);
+      s.classList.toggle('is-past', i < cur);
+    });
+    applyFrags();
+
+    var total = slides.length;
+    prog.style.width = (total > 1 ? (cur / (total - 1)) * 100 : 100) + '%';
+    hN.textContent = cur + 1;
+    hSec.textContent = slides[cur].getAttribute('data-title') || '';
+
+    var n = slides[cur].querySelector('.notes-src');
+    notes.innerHTML = n ? n.innerHTML : '<i style="color:var(--dim)">Sin notas para esta diapositiva.</i>';
+
+    Array.prototype.forEach.call(ovGrid.children, function(b, i){
+      b.classList.toggle('cur', i === cur);
+    });
+
+    if (history.replaceState) history.replaceState(null, '', '#' + (cur + 1));
+    startAnim(slides[cur]);
+  }
+
+  function go(i){
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    if (i !== cur){ if (t0 === null){ t0 = Date.now(); tick(); } }
+    cur = i;
+    step = fragsOf[cur].length;
+    render();
+  }
+
+  function next(){ if (cur < slides.length - 1) go(cur + 1); }
+  function prev(){ if (cur > 0) go(cur - 1); }
+
+  /* ---------- vista general ---------- */
+  slides.forEach(function(s, i){
+    var b = document.createElement('button');
+    b.className = 'ov-item';
+    b.innerHTML = '<span class="i">' + String(i + 1).padStart(2, '0') + '</span>' +
+                  '<span class="t"></span>';
+    b.querySelector('.t').textContent = s.getAttribute('data-title') || ('Diapositiva ' + (i + 1));
+    b.addEventListener('click', function(){
+      body.classList.remove('overview');
+      go(i);
+    });
+    ovGrid.appendChild(b);
+  });
+
+  /* ---------- lightbox ---------- */
+  stage.addEventListener('click', function(e){
+    var box = e.target.closest ? e.target.closest('.fig .box') : null;
+    if (!box) return;
+    var img = box.querySelector('img');
+    if (!img) return;
+    lbImg.src = img.src;
+    var cap = box.parentNode.querySelector('figcaption');
+    lbCap.innerHTML = cap ? cap.innerHTML : '';
+    body.classList.add('lb');
+  });
+  lb.addEventListener('click', function(){ body.classList.remove('lb'); });
+
+  /* ---------- teclado ---------- */
+  document.addEventListener('keydown', function(e){
+    var k = e.key;
+
+    if (body.classList.contains('lb')){
+      if (k === 'Escape' || k === ' ' || k === 'Enter'){ body.classList.remove('lb'); e.preventDefault(); }
+      return;
+    }
+    if (body.classList.contains('show-help')){
+      if (k === 'Escape' || k === '?' || k === '/'){ body.classList.remove('show-help'); e.preventDefault(); }
+      return;
+    }
+    if (body.classList.contains('overview')){
+      if (k === 'Escape' || k === 'o' || k === 'O'){ body.classList.remove('overview'); e.preventDefault(); }
+      return;
+    }
+
+    switch (k){
+      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
+        next(); e.preventDefault(); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp':
+        prev(); e.preventDefault(); break;
+      case 'n': case 'N':
+        go(cur + 1); e.preventDefault(); break;
+      case 'p': case 'P':
+        go(cur - 1); e.preventDefault(); break;
+      case 'Home':
+        go(0); e.preventDefault(); break;
+      case 'End':
+        go(slides.length - 1); e.preventDefault(); break;
+      case 'o': case 'O': case 'Escape':
+        body.classList.toggle('overview'); e.preventDefault(); break;
+      case 's': case 'S':
+        body.classList.toggle('show-notes'); e.preventDefault(); break;
+      case 't': case 'T':
+        t0 = Date.now(); tick(); e.preventDefault(); break;
+      case '?': case '/':
+        body.classList.toggle('show-help'); e.preventDefault(); break;
+      case 'f': case 'F':
+        if (!document.fullscreenElement){ document.documentElement.requestFullscreen(); }
+        else { document.exitFullscreen(); }
+        e.preventDefault(); break;
+      default:
+        if (/^[1-9]$/.test(k)){ go(parseInt(k, 10) - 1); e.preventDefault(); }
+    }
+  });
+
+  /* ---------- gestos táctiles ---------- */
+  var tx = 0, tyv = 0;
+  stage.addEventListener('touchstart', function(e){
+    tx = e.changedTouches[0].clientX; tyv = e.changedTouches[0].clientY;
+  }, {passive:true});
+  stage.addEventListener('touchend', function(e){
+    var dx = e.changedTouches[0].clientX - tx;
+    var dy = e.changedTouches[0].clientY - tyv;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)){ dx < 0 ? next() : prev(); }
+  }, {passive:true});
+
+  /* ---------- selector de tema ----------
+     Tres temas claros, pensados para el proyector del aula. Provisorio:
+     se elimina junto con #themeSwitch cuando se decida el definitivo. */
+  var themeBtns = Array.prototype.slice.call(document.querySelectorAll('#themeSwitch button'));
+  function setTheme(t){
+    body.classList.remove('theme-a', 'theme-b', 'theme-c');
+    if (t !== 'a') body.classList.add('theme-' + t);
+    themeBtns.forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-theme') === t); });
+    try { localStorage.setItem('rvTheme', t); } catch (e) {}
+  }
+  themeBtns.forEach(function(b){
+    b.addEventListener('click', function(){ setTheme(b.getAttribute('data-theme')); });
+  });
+  var savedTheme = 'a';
+  try { savedTheme = localStorage.getItem('rvTheme') || 'a'; } catch (e) {}
+  setTheme(savedTheme);
+
+  /* ---------- escala de fuente en vivo ----------
+     Un solo control mueve --user-scale, que --fs-base y --sp-base
+     multiplican (ver :root). Así se agranda o achica TODO el texto
+     y el espaciado proporcionalmente, sin volver a tocar el CSS.
+     Los diagramas SVG quedan afuera a propósito: su geometría es
+     fija y escalarlos rompería las cajas. */
+  var FS_MIN = 0.75, FS_MAX = 1.4, FS_STEP = 0.05;
+  var fsDown = document.getElementById('fsDown');
+  var fsUp   = document.getElementById('fsUp');
+  var fsPct  = document.getElementById('fsPct');
+  var fsScale = 1;
+  function applyFontScale(){
+    document.documentElement.style.setProperty('--user-scale', fsScale.toFixed(2));
+    fsPct.textContent = Math.round(fsScale * 100) + '%';
+    fsDown.disabled = fsScale <= FS_MIN + 1e-6;
+    fsUp.disabled = fsScale >= FS_MAX - 1e-6;
+    try { localStorage.setItem('rvFontScale', fsScale.toFixed(2)); } catch (e) {}
+  }
+  fsDown.addEventListener('click', function(){
+    fsScale = Math.max(FS_MIN, +(fsScale - FS_STEP).toFixed(2));
+    applyFontScale();
+  });
+  fsUp.addEventListener('click', function(){
+    fsScale = Math.min(FS_MAX, +(fsScale + FS_STEP).toFixed(2));
+    applyFontScale();
+  });
+  try {
+    var savedScale = parseFloat(localStorage.getItem('rvFontScale'));
+    if (savedScale && savedScale >= FS_MIN && savedScale <= FS_MAX) fsScale = savedScale;
+  } catch (e) {}
+  applyFontScale();
+
+  /* ---------- API de depuración ---------- */
+  window.__deck = { go: go, next: next, prev: prev, animators: animators,
+                    slides: slides, estado: function(){ return { cur: cur, step: step }; } };
+
+  /* ---------- arranque ---------- */
+  var h = parseInt((location.hash || '').replace('#',''), 10);
+  cur = (h && h >= 1 && h <= slides.length) ? h - 1 : 0;
+  step = 0;
+  render();
+})();
+</script>
+</body>
+</html>
