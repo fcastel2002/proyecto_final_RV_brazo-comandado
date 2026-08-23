@@ -49,6 +49,12 @@ $RECYCLE.BIN/
 .pio/
 .platformio/
 *.pioenvs/
+
+# === Python ===
+.venv*/
+__pycache__/
+*.py[cod]
+
 /Planta_BrazoRobótico/ProjectSettings
 /Planta_BrazoRobótico/ProjectSettings
 /Planta_BrazoRobótico/Packages

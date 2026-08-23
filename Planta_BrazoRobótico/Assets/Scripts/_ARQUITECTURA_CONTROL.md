@@ -122,7 +122,7 @@ _velocity = _dirX * (rawX * _signX)
 
 Si el input esta suprimido o el modo camara esta activo, `_velocity` queda en cero y se limpia la UI de acciones articulares.
 
-`RemapAxesFromCamera()` recalcula `_dirX`, `_dirZ`, `_signX` y `_signZ` al volver desde el modo camara para que los ejes horizontales se sientan naturales desde la posicion del operador.
+`RemapAxesFromCamera()` recalcula `_dirX`, `_dirZ`, `_signX` y `_signZ` al iniciar y al volver desde el modo camara para que los ejes horizontales se sientan naturales desde la posicion del operador. El remapeo inicial ocurre despues de que `Start()` tiene disponibles la camara principal y `_endEffector`; no depende de que el usuario mueva la camara.
 
 ---
 
@@ -249,7 +249,7 @@ Eventos que capturan orientacion:
 
 | Evento | Accion |
 |---|---|
-| Inicialización (Play Mode / Inicio) | `CaptureFixedOrientation()` en cuanto el controlador se vuelve válido. |
+| Inicialización (Play Mode / Inicio) | `RemapAxesFromCamera()` con la camara principal y `_endEffector`; `CaptureFixedOrientation()` en cuanto el controlador se vuelve válido. |
 | Volver de modo camara a modo robot | `RemapAxesFromCamera()`, `ResetPIDs()`, `CaptureFixedOrientation()` |
 | Cambio de perfil de input | Sale de modo camara, resetea estado y recaptura orientacion |
 

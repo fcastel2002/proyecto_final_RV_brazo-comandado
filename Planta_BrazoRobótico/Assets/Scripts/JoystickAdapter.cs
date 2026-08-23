@@ -517,7 +517,12 @@ public class JoystickAdapter : MonoBehaviour
     private void Start()
     {
         if (_endEffector != null)
+        {
             InitDefaultMapping();
+            // El primer mapeo debe respetar la posicion inicial de la camara,
+            // sin esperar a que el usuario entre y salga del modo camara.
+            RemapAxesFromCamera();
+        }
 
         InitPIDs();
         TryLoadJointLimitsDynamic();

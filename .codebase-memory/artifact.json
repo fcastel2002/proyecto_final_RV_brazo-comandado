@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "23d251b93b2511b57f495fcf491f4dfbf7683624",
-    "indexed_at": "2026-08-17T18:28:45Z",
-    "project": "D-06.-Proyectos-proyecto_final_RV_brazo-comandado",
-    "nodes": 53151,
-    "edges": 101407,
-    "original_size": 135200768,
-    "compressed_size": 17187863,
+    "commit": "2f7c6efdf84d9cdaef38e195be0f7df45db619f8",
+    "indexed_at": "2026-08-23T23:07:59Z",
+    "project": "C-Users-caste-OneDrive-Documentos-GitHub-proyecto_final_RV_brazo-comandado",
+    "nodes": 54143,
+    "edges": 99548,
+    "original_size": 177930240,
+    "compressed_size": 18629058,
     "compression_level": 3
 }

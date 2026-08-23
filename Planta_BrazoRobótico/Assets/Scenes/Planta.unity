@@ -6978,10 +6978,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JointStateBroadcaster
   _controller: {fileID: 1731028599}
+  _gripperAnimator: {fileID: 0}
   _enableBroadcast: 1
   _serverPort: 57121
-  _sendHz: 25
-  _autoCleanupEnabled: 0
+  _sendHz: 50
+  _autoCleanupEnabled: 1
   _subscriberTimeoutSeconds: 15
 --- !u!4 &1547311591
 Transform:

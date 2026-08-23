@@ -1210,3 +1210,50 @@ Resultado observado:
 
 Decision:
 - Integrar permanentemente. Con esto, `InfoPanel_Gripper` queda enteramente estático salvo la cantidad variable de filas de IP, que ahora sigue el mismo mecanismo de plantilla-clonada-bajo-demanda que `PID_RowTemplate`, `Guide_ItemTemplate` y `Metrics_RowTemplate`. No se tocó ningún script de la cadena de control ni `JointStateBroadcaster`.
+
+---
+
+### 2026-08-23 (14) - Carga aditiva de `Map_v2` al iniciar la aplicación
+
+Sintoma:
+- En el ejecutable se veían el robot, HUD y objetos propios de `Planta.unity`, pero no el entorno industrial, aun con `Planta.unity` y `Map_v2.unity` habilitadas en Build Profiles.
+
+Diagnóstico:
+- El proyecto trabaja con multi-scene editing: `Planta.unity` contiene robot, cámaras, HUD y managers; `Map_v2.unity` contiene el entorno.
+- Incluir ambas escenas en Build Profiles solo las empaqueta y les asigna índices. El ejecutable inicia `Planta` (índice 0) y no carga `Map_v2` automáticamente.
+
+Cambio aplicado:
+- `Assets/Scripts/GameManager.cs`: en `Start()` verifica si `Map_v2` ya está cargada (para no duplicarla al ejecutar con ambas escenas abiertas en el Editor) y, de no estarlo, la carga con `SceneManager.LoadSceneAsync(..., LoadSceneMode.Additive)`.
+- La ruta se valida con `Application.CanStreamedLevelBeLoaded`; si la escena no está habilitada en Build Profiles o no puede cargarse, se informa el error y `Planta` continúa sin bloquearse.
+- La escena activa permanece siendo `Planta`; no se modifican cámaras, UI, control del brazo, ROS, gripper ni la cadena PID/IK.
+
+Resultado observado:
+- Pendiente de confirmar en Play Mode y en un ejecutable. Por decisión del usuario, en esta intervención no se ejecutó Unity, batchmode, tests ni compilación.
+
+Decision:
+- Integrar como solución de arranque para conservar el diseño multi-scene. No reordenar las escenas: `Map_v2` no contiene la cámara, el robot ni el HUD.
+
+---
+
+### 2026-08-23 (15) - Remapeo de ejes respecto de la camara al arrancar
+
+Sintoma:
+- El manejo horizontal del robot no respetaba la posicion inicial de la camara hasta que el usuario movia la camara y luego salia del modo camara.
+
+Diagnóstico:
+- `JoystickAdapter.Start()` solo ejecutaba `InitDefaultMapping()`, dejando `_dirX` y `_dirZ` en `Vector3.right`/`Vector3.forward`.
+- `RemapAxesFromCamera()` solo se invocaba al volver del modo camara o durante un cambio de perfil cuando ya estaba activo ese modo; por eso el primer recorrido podia usar el marco global en vez del marco relativo a la camara.
+
+Cambio aplicado:
+- `Assets/Scripts/JoystickAdapter.cs`: despues de inicializar el mapeo seguro por defecto, `Start()` llama a `RemapAxesFromCamera()` cuando `_endEffector` esta asignado.
+- Se mantiene el remapeo al salir del modo camara y no se recalculan ejes en cada frame: la camara puede moverse durante ese modo y el remapeo se actualiza al volver, mientras que el arranque ya queda correctamente inicializado.
+
+Parámetros/archivos afectados:
+- `Assets/Scripts/JoystickAdapter.cs`: inicialización de `_dirX`, `_dirZ`, `_signX` y `_signZ`.
+- `Assets/Scripts/_ARQUITECTURA_CONTROL.md`: eventos de remapeo documentados.
+
+Resultado observado:
+- Pendiente de confirmar en Play Mode con la camara en una posicion distinta de la orientacion global. Por decisión del usuario, no se ejecutó Unity ni compilación en esta intervención.
+
+Decision:
+- Integrar permanentemente. El cambio solo corrige la inicialización del marco de entrada antes de `FixedUpdate()`; no modifica la integración cartesiana, IK, PID, unidades ni la aplicación final de `SetJoints()`.
