@@ -30,6 +30,21 @@ import threading
 from datetime import datetime
 
 
+def _disable_udp_connreset(sock):
+    """En Windows, si un datagrama enviado a Unity no encuentra a nadie
+    escuchando (por ej. se detuvo el modo Run), el SO devuelve un ICMP
+    "Port Unreachable" que Winsock traduce en un WSAECONNRESET (10054)
+    en la SIGUIENTE recv() de este socket UDP, aunque UDP no tenga
+    conexion. MATLAB (udpport) ya neutraliza esto internamente; en
+    Python hay que desactivarlo a mano con este ioctl. No existe en
+    Linux/Mac, de ahi el hasattr."""
+    if hasattr(socket, "SIO_UDP_CONNRESET"):
+        try:
+            sock.ioctl(socket.SIO_UDP_CONNRESET, False)
+        except OSError:
+            pass
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Cliente UDP con suscripcion dinamica (Unity -> Python)."
@@ -74,6 +89,7 @@ def main():
     target = (target_ip, target_port)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    _disable_udp_connreset(sock)
     sock.settimeout(args.recv_timeout)
 
     stop_event = threading.Event()
@@ -101,6 +117,12 @@ def main():
             try:
                 data, addr = sock.recvfrom(args.bufsize)
             except socket.timeout:
+                continue
+            except ConnectionResetError:
+                # Unity dejo de escuchar (se detuvo el modo Run) y el
+                # ultimo HELLO/keep-alive volvio como ICMP Port
+                # Unreachable. No es un error fatal: seguimos
+                # reintentando el keep-alive hasta que Unity vuelva.
                 continue
 
             # Debug: ver el paquete tal cual llega, sin parsear.

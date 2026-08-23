@@ -70,6 +70,20 @@ DH_PARAMS = [
 CONFIG_OFFSET_DEG = np.array([0.0, 90.0, -90.0, 0.0, 0.0, 0.0])
 CONFIG_FACTOR = np.array([1.0, 1.0, 1.0, 1.0, -1.0, 1.0])
 
+# ---------------------------------------------------------------------------
+# Gripper (OnRobot RG2 montado en el TCP) -- representacion parametrica, no
+# un calco del mesh: el prefab de Unity tiene una jerarquia de escalas FBX
+# anidadas (x347.49, x0.001, x999.99994) demasiado inconsistente para
+# reconstruir cotas exactas sin abrir el Editor. Lo que SI esta confirmado:
+#   - Carrera total (stroke) 0-100mm, ver Ctrl_OnRobotRG2_Custom.cs (s_max).
+#   - Se agarra a la muneca (mismo frame que ya usa el 'tool' del DHRobot).
+# Cuerpo y largo de dedo son valores representativos, ajustables aca.
+# Cotas ajustadas a la ficha tecnica real del RG2 (~195-236mm base-a-dedo);
+# antes se veia desproporcionadamente chico contra el resto de los eslabones.
+GRIPPER_BODY_LENGTH_M = 0.09
+GRIPPER_FINGER_LENGTH_M = 0.11
+GRIPPER_MAX_HALF_STROKE_M = 0.05  # mitad de los 100mm de carrera total
+
 
 def build_robot():
     links = [
@@ -88,6 +102,30 @@ def unity_deg_to_q_rad(q_unity_deg):
     return np.deg2rad(adjusted_deg)
 
 
+def gripper_segments(robot, q_rad, opening_fraction):
+    """Devuelve 3 segmentos (body, dedo izq, dedo der) como pares de puntos
+    mundo ((x0,y0,z0), (x1,y1,z1)), colgando del TCP (mismo frame 'tool'
+    que ya usa el DHRobot, con el Rz(pi) de Flange incluido)."""
+    t_tcp = robot.fkine(q_rad)
+    half_gap = np.clip(opening_fraction, 0.0, 1.0) * GRIPPER_MAX_HALF_STROKE_M
+
+    def world_point(x, y, z):
+        return np.asarray(t_tcp * np.array([x, y, z]), dtype=float).flatten()
+
+    origin = world_point(0.0, 0.0, 0.0)
+    body_end = world_point(0.0, 0.0, GRIPPER_BODY_LENGTH_M)
+    left_root = world_point(-half_gap, 0.0, GRIPPER_BODY_LENGTH_M)
+    left_tip = world_point(-half_gap, 0.0, GRIPPER_BODY_LENGTH_M + GRIPPER_FINGER_LENGTH_M)
+    right_root = world_point(half_gap, 0.0, GRIPPER_BODY_LENGTH_M)
+    right_tip = world_point(half_gap, 0.0, GRIPPER_BODY_LENGTH_M + GRIPPER_FINGER_LENGTH_M)
+
+    return [
+        (origin, body_end),
+        (left_root, left_tip),
+        (right_root, right_tip),
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Cliente UDP (mismo protocolo de suscripcion/keep-alive de siempre)
 # ---------------------------------------------------------------------------
@@ -99,6 +137,21 @@ def ask_target():
             return ip, int(port_str)
         except ValueError:
             print("Puerto invalido, ingresa un numero entero.")
+
+
+def _disable_udp_connreset(sock):
+    """En Windows, si un datagrama enviado a Unity no encuentra a nadie
+    escuchando (por ej. se detuvo el modo Run), el SO devuelve un ICMP
+    "Port Unreachable" que Winsock traduce en un WSAECONNRESET (10054)
+    en la SIGUIENTE recv() de este socket UDP, aunque UDP no tenga
+    conexion. MATLAB (udpport) ya neutraliza esto internamente; en
+    Python hay que desactivarlo a mano con este ioctl. No existe en
+    Linux/Mac, de ahi el hasattr."""
+    if hasattr(socket, "SIO_UDP_CONNRESET"):
+        try:
+            sock.ioctl(socket.SIO_UDP_CONNRESET, False)
+        except OSError:
+            pass
 
 
 def receive_latest(sock, bufsize):
@@ -148,6 +201,7 @@ def main():
     target = (target_ip, target_port)
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    _disable_udp_connreset(sock)
     sock.settimeout(args.recv_timeout)
 
     def send_subscription():
@@ -185,6 +239,20 @@ def main():
 
     joint_text.set_text(format_panel([0.0] * 6))
 
+    # Segmentos del gripper (body + 2 dedos), colgados del TCP. Se crean una
+    # sola vez y se reposicionan en cada paquete, igual que joint_text.
+    gripper_lines = [
+        env.ax.plot([], [], [], color="black", linewidth=5)[0] for _ in range(3)
+    ]
+
+    def update_gripper_visual(q_rad, opening_fraction):
+        segments = gripper_segments(robot, q_rad, opening_fraction)
+        for line, (p0, p1) in zip(gripper_lines, segments):
+            xs, ys, zs = zip(p0, p1)
+            line.set_data_3d(xs, ys, zs)
+
+    update_gripper_visual(robot.q, 0.0)
+
     print("Escuchando datos entrantes... (Ctrl+C para detener)\n")
 
     try:
@@ -198,6 +266,13 @@ def main():
             except socket.timeout:
                 env.step(0.05)  # sigue refrescando la ventana aunque no llegue nada
                 continue
+            except ConnectionResetError:
+                # Unity dejo de escuchar (se detuvo el modo Run) y el
+                # ultimo HELLO/keep-alive volvio como ICMP Port
+                # Unreachable. No es un error fatal: seguimos
+                # reintentando el keep-alive hasta que Unity vuelva.
+                env.step(0.05)
+                continue
 
             raw = data.decode("ascii", errors="replace").strip()
             if args.verbose:
@@ -208,16 +283,24 @@ def main():
                 continue
 
             parts = raw.split(",")
-            if len(parts) != 6:
+            if len(parts) not in (6, 7):
                 continue
 
             try:
-                q_unity_deg = [float(p) for p in parts]
+                values = [float(p) for p in parts]
             except ValueError:
                 continue
 
-            robot.q = unity_deg_to_q_rad(q_unity_deg)
+            q_unity_deg = values[:6]
+            # Paquetes viejos (sin 7mo campo) no traen estado de gripper:
+            # se asume cerrado, que es el estado inicial real en Unity
+            # (GripperController.isGripperClosed arranca en true).
+            gripper_opening = values[6] if len(values) == 7 else 0.0
+
+            q_rad = unity_deg_to_q_rad(q_unity_deg)
+            robot.q = q_rad
             joint_text.set_text(format_panel(q_unity_deg))
+            update_gripper_visual(q_rad, gripper_opening)
             env.step(0.05)
 
     except KeyboardInterrupt:

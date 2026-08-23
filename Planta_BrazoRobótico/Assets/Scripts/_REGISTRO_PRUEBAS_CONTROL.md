@@ -1186,3 +1186,27 @@ Resultado observado:
 
 Decision:
 - No integrar todavía como definitivo — falta la confirmación del paso Kinematic. Documentado para que la investigación (y el motivo de cada paso) quede trazable de una sesión a la otra.
+
+---
+
+### 2026-08-17 (13) - Estatización de `ConnectedClientsPanel` (última sección dinámica del Canvas)
+
+Sintoma:
+- La sección "CLIENTES CONECTADOS" del panel (lista de IPs suscriptas a `JointStateBroadcaster`) aparecía "medio rota" en el Canvas — desalineada respecto del resto de `InfoPanel_Gripper`.
+
+Causa:
+- `ConnectedClientsPanel.cs` era la única sección que seguía el patrón dinámico antiguo (como `LeftLayoutManager`/`J6OverlayController` antes de refactorizarlos): se auto-instanciaba por completo en runtime vía `RuntimeInitializeOnLoadMethod`, buscaba `InfoPanel_Gripper`/`Guide_Section` por `GameObject.Find` y se insertaba por `SetSiblingIndex(guideSection.GetSiblingIndex() + 1)` — dependiente del orden de ejecución de otros sistemas que tocan el mismo Canvas. Además clonaba su plantilla de fila directamente desde `PID_Section/PID_Row_J1`, una fila **real, en uso**, actualizada cada frame por `PidActionsPanel`, en vez de una plantilla inactiva dedicada como el resto de los paneles.
+
+Cambio aplicado:
+- `ConnectedClientsPanel.cs` reescrito siguiendo el mismo patrón que `PidActionsPanel`/`ControlGuidePanel`/`PerformanceMetricsPanel`: ya no se auto-instancia ni busca nada por `GameObject.Find`; vive como componente en `Clients_Section` (hijo estático de `InfoPanel_Gripper`, creado a mano en el Editor con Vertical Layout Group + Content Size Fitter, igual que las demás secciones). Mantiene una fila fija "Sin clientes conectados" y clona las filas de IP (cantidad inherentemente variable) desde su propia plantilla inactiva (`Clients_RowTemplate`), ya no desde `PID_Row_J1`.
+- Hierarchy: `Clients_Section` (título + `Clients_EmptyRow` + `Clients_RowTemplate` inactiva) agregado a mano después de `Guide_Section`.
+
+Archivos/parametros:
+- `Assets/Scripts/ConnectedClientsPanel.cs` (reescrito)
+- `Assets/Scenes/Planta.unity`: `Clients_Section` (nuevo, hijo de `InfoPanel_Gripper`)
+
+Resultado observado:
+- Feedback del usuario en Play Mode: "Funcionó bien" — las filas de IP aparecen alineadas sin afectar la posición de `CameraGripperView` ni `Metrics_Section`.
+
+Decision:
+- Integrar permanentemente. Con esto, `InfoPanel_Gripper` queda enteramente estático salvo la cantidad variable de filas de IP, que ahora sigue el mismo mecanismo de plantilla-clonada-bajo-demanda que `PID_RowTemplate`, `Guide_ItemTemplate` y `Metrics_RowTemplate`. No se tocó ningún script de la cadena de control ni `JointStateBroadcaster`.

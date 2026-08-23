@@ -44,6 +44,9 @@ from flask import Flask, jsonify, render_template_string
 _state_lock = threading.Lock()
 _state = {
     "q": [0.0] * 6,
+    # 0=cerrado..1=abierto. Arranca en 0: es el estado inicial real del
+    # gripper en Unity (GripperController.isGripperClosed arranca en true).
+    "gripper": 0.0,
     "last_packet_time": 0.0,
     "packet_count": 0,
     "target_ip": "",
@@ -63,6 +66,21 @@ def ask_target():
             return ip, port
         except ValueError:
             print("Puerto invalido, ingresa un numero entero.")
+
+
+def _disable_udp_connreset(sock):
+    """En Windows, si un datagrama enviado a Unity no encuentra a nadie
+    escuchando (por ej. se detuvo el modo Run), el SO devuelve un ICMP
+    "Port Unreachable" que Winsock traduce en un WSAECONNRESET (10054)
+    en la SIGUIENTE recv() de este socket UDP, aunque UDP no tenga
+    conexion. MATLAB (udpport) ya neutraliza esto internamente; en
+    Python hay que desactivarlo a mano con este ioctl. No existe en
+    Linux/Mac, de ahi el hasattr."""
+    if hasattr(socket, "SIO_UDP_CONNRESET"):
+        try:
+            sock.ioctl(socket.SIO_UDP_CONNRESET, False)
+        except OSError:
+            pass
 
 
 def receive_latest(sock, bufsize):
@@ -88,6 +106,7 @@ def udp_worker(target_ip, target_port, keepalive_interval, bufsize, recv_timeout
     """Hilo de fondo: suscripcion + keep-alive + recepcion de paquetes."""
     target = (target_ip, target_port)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    _disable_udp_connreset(sock)
     sock.settimeout(recv_timeout)
 
     def send_subscription():
@@ -112,22 +131,32 @@ def udp_worker(target_ip, target_port, keepalive_interval, bufsize, recv_timeout
             data = receive_latest(sock, bufsize)
         except socket.timeout:
             continue
+        except ConnectionResetError:
+            # Unity dejo de escuchar (se detuvo el modo Run) y el ultimo
+            # HELLO/keep-alive volvio como ICMP Port Unreachable. No es
+            # un error fatal: seguimos reintentando el keep-alive hasta
+            # que Unity vuelva a estar disponible.
+            continue
 
         raw = data.decode("ascii", errors="replace").strip()
         if not raw:
             continue
 
         parts = raw.split(",")
-        if len(parts) != 6:
+        if len(parts) not in (6, 7):
             continue
 
         try:
-            q = [float(p) for p in parts]
+            values = [float(p) for p in parts]
         except ValueError:
             continue
 
+        q = values[:6]
+
         with _state_lock:
             _state["q"] = q
+            if len(values) == 7:
+                _state["gripper"] = values[6]
             _state["last_packet_time"] = time.monotonic()
             _state["packet_count"] += 1
 
@@ -251,6 +280,14 @@ const DH = [
 const CONFIG_OFFSET_DEG = [0, 90, -90, 0, 0, 0];
 const CONFIG_FACTOR     = [1, 1, 1, 1, -1, 1];
 
+// Gripper (OnRobot RG2 en el TCP) -- representacion parametrica, ver nota
+// equivalente en udp_robot_viewer.py sobre por que no es un calco del mesh.
+// Cotas ajustadas a la ficha tecnica real del RG2 (~195-236mm base-a-dedo),
+// antes se veia desproporcionadamente chico contra el resto de los eslabones.
+const GRIPPER_BODY_LENGTH_M = 0.09;
+const GRIPPER_FINGER_LENGTH_M = 0.11;
+const GRIPPER_MAX_HALF_STROKE_M = 0.05; // mitad de los 100mm de carrera total
+
 function computeJointPositions(qDeg) {
   let T = new THREE.Matrix4(); // identidad = frame Base
   const points = [new THREE.Vector3(0, 0, 0)];
@@ -269,7 +306,32 @@ function computeJointPositions(qDeg) {
     T = T.clone().multiply(A);
     points.push(new THREE.Vector3().setFromMatrixPosition(T));
   }
-  return points;
+  return { points, T6: T };
+}
+
+// Frame "Flange": misma rotacion fija de 180 grados que 'tool' en
+// udp_robot_viewer.py (SE3.Rz(pi)) y robot.tool en robot_udp_plot.m.
+function computeTcpTransform(T6) {
+  const rzPi = new THREE.Matrix4().makeRotationZ(Math.PI);
+  return T6.clone().multiply(rzPi);
+}
+
+function computeGripperSegments(tcpMatrix, openingFraction) {
+  const halfGap = Math.min(1, Math.max(0, openingFraction)) * GRIPPER_MAX_HALF_STROKE_M;
+  const localPoint = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(tcpMatrix);
+
+  const tcpOrigin = localPoint(0, 0, 0);
+  const bodyEnd = localPoint(0, 0, GRIPPER_BODY_LENGTH_M);
+  const leftRoot = localPoint(-halfGap, 0, GRIPPER_BODY_LENGTH_M);
+  const leftTip = localPoint(-halfGap, 0, GRIPPER_BODY_LENGTH_M + GRIPPER_FINGER_LENGTH_M);
+  const rightRoot = localPoint(halfGap, 0, GRIPPER_BODY_LENGTH_M);
+  const rightTip = localPoint(halfGap, 0, GRIPPER_BODY_LENGTH_M + GRIPPER_FINGER_LENGTH_M);
+
+  return [
+    [tcpOrigin, bodyEnd],
+    [leftRoot, leftTip],
+    [rightRoot, rightTip],
+  ];
 }
 
 // ---------------------------------------------------------------------
@@ -311,14 +373,15 @@ function createLink(p1, p2, radius, color) {
   return mesh;
 }
 
-function updateRobotVisual(qDeg) {
+function updateRobotVisual(qDeg, gripperOpening) {
   while (robotGroup.children.length) {
     robotGroup.remove(robotGroup.children[0]);
   }
 
-  const points = computeJointPositions(qDeg);
+  const { points, T6 } = computeJointPositions(qDeg);
   const jointColor = 0xff6a13; // naranja KUKA
   const linkColor = 0x2b2f38;
+  const gripperColor = 0x8a929e;
 
   points.forEach((p, idx) => {
     const sphere = new THREE.Mesh(
@@ -333,9 +396,16 @@ function updateRobotVisual(qDeg) {
     const link = createLink(points[i], points[i + 1], 0.035, linkColor);
     if (link) robotGroup.add(link);
   }
+
+  const tcpMatrix = computeTcpTransform(T6);
+  const gripperSegments = computeGripperSegments(tcpMatrix, gripperOpening || 0);
+  gripperSegments.forEach(([p1, p2]) => {
+    const segment = createLink(p1, p2, 0.02, gripperColor);
+    if (segment) robotGroup.add(segment);
+  });
 }
 
-updateRobotVisual([0, 0, 0, 0, 0, 0]);
+updateRobotVisual([0, 0, 0, 0, 0, 0], 0);
 
 // ---------------------------------------------------------------------
 // Camara orbital manual (mouse), sin dependencias extra
@@ -404,7 +474,7 @@ async function poll() {
       document.getElementById(`gauge-${i}`).style.setProperty('--pct', pctFor(v) + '%');
       document.getElementById(`value-${i}`).innerHTML = v.toFixed(1) + '&deg;';
     }
-    updateRobotVisual(data.q);
+    updateRobotVisual(data.q, data.gripper);
 
     const badge = document.getElementById('status-badge');
     if (data.age_seconds < 1.0) {
@@ -442,6 +512,7 @@ def index():
 def api_state():
     with _state_lock:
         q = list(_state["q"])
+        gripper = _state["gripper"]
         last_packet_time = _state["last_packet_time"]
         packet_count = _state["packet_count"]
         target_ip = _state["target_ip"]
@@ -451,6 +522,7 @@ def api_state():
 
     return jsonify({
         "q": q,
+        "gripper": gripper,
         "age_seconds": age,
         "packet_count": packet_count,
         "target_ip": target_ip,

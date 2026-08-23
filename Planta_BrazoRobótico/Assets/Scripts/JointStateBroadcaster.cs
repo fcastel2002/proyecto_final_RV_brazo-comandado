@@ -11,7 +11,8 @@ using Debug = UnityEngine.Debug;
 
 /// <summary>
 /// Lee los ángulos de las 6 articulaciones del robot (Preliy Flange) y los
-/// transmite por UDP como "q1,q2,q3,q4,q5,q6\n" en grados, a una tasa configurable.
+/// transmite por UDP como "q1,q2,q3,q4,q5,q6,gripper\n" en grados (gripper
+/// normalizado 0=cerrado..1=abierto), a una tasa configurable.
 /// Independiente de JointStatePublisher.cs (ROS): mismo patrón de lectura,
 /// transporte distinto.
 ///
@@ -22,8 +23,10 @@ using Debug = UnityEngine.Debug;
 /// Cómo usar:
 ///   1. Agregar este componente a cualquier GameObject de la escena.
 ///   2. Asignar el campo "Controller" en el Inspector con el componente Controller del robot.
-///   3. Configurar el puerto local del servidor (por defecto 25001).
-///   4. Desde el cliente, enviar cualquier datagrama (ej. "HELLO") a ese puerto para suscribirse,
+///   3. Asignar el campo "Gripper Animator" con el Ctrl_OnRobotRG2_Custom del gripper (opcional:
+///      si se deja vacío, se intenta autoencontrar en Start() y si no aparece se envía 0=cerrado).
+///   4. Configurar el puerto local del servidor (por defecto 25001).
+///   5. Desde el cliente, enviar cualquier datagrama (ej. "HELLO") a ese puerto para suscribirse,
 ///      y repetirlo periódicamente como keep-alive si la limpieza automática está habilitada.
 /// </summary>
 public class JointStateBroadcaster : MonoBehaviour
@@ -31,6 +34,10 @@ public class JointStateBroadcaster : MonoBehaviour
     [Header("Preliy Flange")]
     [Tooltip("Arrastrá aquí el componente Controller del robot.")]
     [SerializeField] private Controller _controller;
+
+    [Header("Gripper")]
+    [Tooltip("Ctrl_OnRobotRG2_Custom del gripper, para incluir su apertura (0=cerrado..1=abierto) en el broadcast. Si se deja vacío se busca automáticamente en Start().")]
+    [SerializeField] private Ctrl_OnRobotRG2_Custom _gripperAnimator;
 
     [Header("UDP")]
     [Tooltip("Activa/desactiva el envío sin quitar el componente.")]
@@ -73,6 +80,13 @@ public class JointStateBroadcaster : MonoBehaviour
         if (_controller == null)
             Debug.LogError("[JointStateBroadcaster] Controller no asignado en el Inspector.");
 
+        if (_gripperAnimator == null)
+        {
+            _gripperAnimator = FindFirstObjectByType<Ctrl_OnRobotRG2_Custom>();
+            if (_gripperAnimator == null)
+                Debug.LogWarning("[JointStateBroadcaster] Gripper Animator no asignado ni encontrado: se transmitirá siempre 0 (cerrado).");
+        }
+
         BeginListening(_udpClient);
     }
 
@@ -104,6 +118,10 @@ public class JointStateBroadcaster : MonoBehaviour
         _messageBuilder.Append(jointState.Value[4].ToString("F2", CultureInfo.InvariantCulture));
         _messageBuilder.Append(',');
         _messageBuilder.Append(jointState.Value[5].ToString("F2", CultureInfo.InvariantCulture));
+        _messageBuilder.Append(',');
+
+        float gripperOpening = _gripperAnimator != null ? _gripperAnimator.OpeningFraction : 0f;
+        _messageBuilder.Append(gripperOpening.ToString("F3", CultureInfo.InvariantCulture));
         _messageBuilder.Append('\n');
 
         byte[] datagram = Encoding.ASCII.GetBytes(_messageBuilder.ToString());
