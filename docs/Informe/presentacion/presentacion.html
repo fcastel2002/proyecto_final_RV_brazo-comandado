@@ -9,6 +9,39 @@
    SISTEMA DE DISEÑO
    ============================================================ */
 :root{
+  /* ============================================================
+     ESCALA TIPOGRÁFICA MODULAR
+     Una sola fuente de verdad: para agrandar o achicar TODA la
+     presentación de forma proporcional, cambiar --fs-base y/o
+     --fs-ratio acá. Todo el resto de los tamaños de fuente del
+     documento se calculan a partir de estos dos números.
+     ============================================================ */
+  --user-scale:1;                                     /* control en vivo, botones A-/A+ */
+  --fs-ratio:1.16;
+  --fs-base:calc(23px * var(--user-scale));            /* cuerpo de texto */
+  --fs-n3:calc(var(--fs-base) / var(--fs-ratio) / var(--fs-ratio) / var(--fs-ratio)); /* micro-etiquetas mono */
+  --fs-n2:calc(var(--fs-base) / var(--fs-ratio) / var(--fs-ratio));  /* texto secundario chico */
+  --fs-n1:calc(var(--fs-base) / var(--fs-ratio));                    /* texto secundario */
+  --fs-0: var(--fs-base);                                            /* cuerpo */
+  --fs-1: calc(var(--fs-base) * var(--fs-ratio));                    /* subtítulos / lead */
+  --fs-2: calc(var(--fs-1) * var(--fs-ratio));                       /* h3 / números chicos */
+  --fs-3: calc(var(--fs-2) * var(--fs-ratio));
+  --fs-4: calc(var(--fs-3) * var(--fs-ratio));                       /* stat grandes */
+  --fs-5: calc(var(--fs-4) * var(--fs-ratio));                       /* h2 */
+  --fs-6: calc(var(--fs-5) * var(--fs-ratio));                       /* h1 */
+  --fs-7: calc(var(--fs-6) * var(--fs-ratio));
+
+  /* Escala de espaciado — mismo principio: un base y un ratio. */
+  --sp-ratio:1.32;
+  --sp-base:calc(23px * var(--user-scale));
+  --sp-n2:calc(var(--sp-base) / var(--sp-ratio) / var(--sp-ratio));
+  --sp-n1:calc(var(--sp-base) / var(--sp-ratio));
+  --sp-0: var(--sp-base);
+  --sp-1: calc(var(--sp-base) * var(--sp-ratio));
+  --sp-2: calc(var(--sp-1) * var(--sp-ratio));
+  --sp-3: calc(var(--sp-2) * var(--sp-ratio));
+  --sp-4: calc(var(--sp-3) * var(--sp-ratio));
+
   /* Tema A · Claro neutro (por defecto) */
   --bg:#f4f5f8;
   --bg-2:#ffffff;
@@ -16,9 +49,9 @@
   --panel-2:rgba(16,22,38,.075);
   --line:rgba(16,22,38,.13);
   --line-2:rgba(16,22,38,.24);
-  --fg:#14181f;
-  --muted:#454e5f;
-  --dim:#636d80;
+  --fg:#0c0e13;
+  --muted:#1d222b;
+  --dim:#4a5266;
   --accent:#c2410c;
   --accent-soft:rgba(194,65,12,.10);
   --accent-border:rgba(194,65,12,.32);
@@ -52,9 +85,9 @@ body.theme-b{
   --panel-2:rgba(50,36,16,.08);
   --line:rgba(50,36,16,.14);
   --line-2:rgba(50,36,16,.25);
-  --fg:#241b0f;
-  --muted:#5a4b38;
-  --dim:#7a6a53;
+  --fg:#170f07;
+  --muted:#2c2013;
+  --dim:#5c4b36;
   --accent:#b1440e;
   --accent-soft:rgba(177,68,14,.11);
   --accent-border:rgba(177,68,14,.34);
@@ -86,8 +119,8 @@ body.theme-c{
   --line:rgba(0,0,0,.22);
   --line-2:rgba(0,0,0,.38);
   --fg:#000000;
-  --muted:#2b2b2b;
-  --dim:#4c4c4c;
+  --muted:#101010;
+  --dim:#3d3d3d;
   --accent:#b8390f;
   --accent-soft:rgba(184,57,15,.10);
   --accent-border:rgba(184,57,15,.4);
@@ -121,22 +154,29 @@ body{
 ::selection{background:var(--accent);color:#fff}
 
 /* ============================================================
-   SELECTOR DE TEMA (temporal, para elegir el mejor para el proyector)
+   BARRA DE CONTROLES (temporal, para probar en el aula)
    ============================================================ */
-#themeSwitch{
-  position:fixed;right:18px;top:16px;z-index:70;
-  display:flex;gap:8px;
+#toolbar{position:fixed;right:18px;top:16px;z-index:70;display:flex;gap:10px}
+#themeSwitch,#fontScale{
+  display:flex;align-items:center;gap:8px;
   background:rgba(255,255,255,.85);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   border:1px solid rgba(0,0,0,.14);border-radius:999px;padding:6px;
   box-shadow:0 4px 18px rgba(0,0,0,.14);
 }
-#themeSwitch button{
+#themeSwitch button,#fontScale button{
   font:600 12.5px/1 var(--mono);letter-spacing:.03em;
   padding:8px 14px;border-radius:999px;border:1px solid transparent;cursor:pointer;
   background:transparent;color:#3a4152;transition:background .15s,color .15s,border-color .15s;
 }
-#themeSwitch button:hover{background:rgba(0,0,0,.06)}
+#themeSwitch button:hover,#fontScale button:hover{background:rgba(0,0,0,.06)}
 #themeSwitch button.on{background:#1c2333;color:#fff;border-color:#1c2333}
+#fontScale button{padding:8px 13px;font-size:14px;font-weight:700}
+#fontScale button:disabled{opacity:.35;cursor:default}
+#fontScale button:disabled:hover{background:transparent}
+#fontScale .pct{
+  font:700 12.5px/1 var(--mono);color:#3a4152;min-width:38px;text-align:center;
+  padding:0 2px;
+}
 
 /* ============================================================
    ESCENARIO 16:9 ESCALADO
@@ -149,7 +189,7 @@ body{
 }
 .slide{
   position:absolute;inset:0;
-  padding:46px 70px 54px;
+  padding:38px 68px 46px;
   display:flex;flex-direction:column;
   opacity:0;visibility:hidden;
   transform:translateY(22px) scale(.985);
@@ -162,22 +202,22 @@ body{
    TIPOGRAFÍA / CABECERAS
    ============================================================ */
 .kicker{
-  font:700 15.5px/1 var(--mono);
-  letter-spacing:.15em;text-transform:uppercase;
+  font:700 var(--fs-n1)/1 var(--mono);
+  letter-spacing:.14em;text-transform:uppercase;
   color:var(--accent);
-  display:flex;align-items:center;gap:12px;margin-bottom:14px;
+  display:flex;align-items:center;gap:12px;margin-bottom:var(--sp-n2);
 }
 .kicker::before{content:"";width:26px;height:2px;background:var(--accent);border-radius:2px}
-h1{font-size:66px;line-height:1.08;font-weight:700;letter-spacing:-.02em}
-h2{font-size:45px;line-height:1.14;font-weight:650;letter-spacing:-.018em}
-h3{font-size:23.5px;line-height:1.25;font-weight:650;letter-spacing:-.01em}
-.s-head{margin-bottom:24px;flex:0 0 auto}
-.s-head .sub{margin-top:12px;font-size:20.5px;line-height:1.48;color:var(--muted);max-width:1200px}
-.body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:center}
-p{font-size:19.5px;line-height:1.55;color:var(--muted)}
-strong{color:var(--fg);font-weight:650}
+h1{font-size:var(--fs-7);line-height:1.06;font-weight:700;letter-spacing:-.02em}
+h2{font-size:var(--fs-6);line-height:1.1;font-weight:650;letter-spacing:-.016em}
+h3{font-size:var(--fs-2);line-height:1.2;font-weight:650;letter-spacing:-.01em}
+.s-head{margin-bottom:var(--sp-1);flex:0 0 auto}
+.s-head .sub{margin-top:var(--sp-n1);font-size:var(--fs-1);line-height:1.42;color:var(--muted);max-width:1260px}
+.body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}
+p{font-size:var(--fs-0);line-height:1.5;color:var(--muted)}
+strong{color:var(--fg);font-weight:700}
 em{color:var(--accent-2);font-style:normal;font-weight:600}
-code,.mono{font-family:var(--mono);font-size:.92em;color:var(--accent-2)}
+code,.mono{font-family:var(--mono);font-size:.9em;color:var(--accent-2)}
 .u{color:var(--fg);font-weight:600}
 
 /* ============================================================
@@ -195,68 +235,76 @@ code,.mono{font-family:var(--mono);font-size:.92em;color:var(--accent-2)}
   background-size:64px 64px;
   -webkit-mask-image:radial-gradient(900px 600px at 20% 50%,#000 10%,transparent 78%);
   mask-image:radial-gradient(900px 600px at 20% 50%,#000 10%,transparent 78%);}
-.title-inner{position:relative;padding:0 74px;max-width:1140px}
+.title-inner{position:relative;padding:0 74px;max-width:1180px}
 .title-logo{height:50px;width:auto;margin-bottom:40px;filter:brightness(0) invert(1);opacity:.92}
-.title-slide h1{font-size:62px;max-width:970px;color:#f5f7fb}
+.title-slide h1{font-size:var(--fs-6);max-width:1010px;color:#f5f7fb}
 .title-slide{--fg:#f5f7fb;--muted:#c3cbdb;--accent:#ff6a13;--accent-2:#35c6f4;--dim:#8b96ac}
 .title-rule{width:96px;height:4px;background:var(--accent);border-radius:3px;margin:28px 0}
-.title-course{font:700 17px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2);margin-bottom:32px}
+.title-course{font:700 var(--fs-n1)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent-2);margin-bottom:32px}
 .title-people{display:flex;gap:64px;margin-top:4px}
-.title-people .grp .lbl{font:700 12px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
-.title-people .grp .nm{font-size:18px;line-height:1.65;color:var(--fg)}
+.title-people .grp .lbl{font:700 var(--fs-n3)/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
+.title-people .grp .nm{font-size:var(--fs-0);line-height:1.6;color:var(--fg)}
 .title-year{position:absolute;right:74px;bottom:60px;font:700 92px/1 var(--sans);color:rgba(255,255,255,.055);letter-spacing:-.04em}
 
 /* ============================================================
    REJILLAS Y TARJETAS
    ============================================================ */
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:26px}
-.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:17px}
-.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}
-.g-6-4{display:grid;grid-template-columns:6fr 4fr;gap:32px;align-items:center}
-.g-4-6{display:grid;grid-template-columns:4fr 6fr;gap:32px;align-items:center}
-.g-5-7{display:grid;grid-template-columns:5fr 7fr;gap:32px;align-items:center}
-.g-7-5{display:grid;grid-template-columns:7fr 5fr;gap:32px;align-items:center}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-1)}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-0)}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-n1)}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--sp-n2)}
+.g-6-4{display:grid;grid-template-columns:6fr 4fr;gap:var(--sp-2);align-items:center}
+.g-4-6{display:grid;grid-template-columns:4fr 6fr;gap:var(--sp-2);align-items:center}
+.g-5-7{display:grid;grid-template-columns:5fr 7fr;gap:var(--sp-2);align-items:center}
+.g-7-5{display:grid;grid-template-columns:7fr 5fr;gap:var(--sp-2);align-items:center}
 .g-stretch{align-items:stretch}
 
 .card{
   background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
-  padding:22px 24px;position:relative;overflow:hidden;
+  padding:var(--sp-0) calc(var(--sp-0) + 4px);position:relative;overflow:hidden;
 }
 .card.tint{background:linear-gradient(160deg,var(--accent-soft),transparent 62%),var(--panel);border-color:var(--accent-border)}
 .card.tint2{background:linear-gradient(160deg,var(--accent-2-soft),transparent 62%),var(--panel);border-color:var(--accent-2-border)}
 .card.danger{background:linear-gradient(160deg,var(--danger-soft),transparent 62%),var(--panel);border-color:var(--danger-border)}
 .card.ok{background:linear-gradient(160deg,var(--ok-soft),transparent 62%),var(--panel);border-color:var(--ok-border)}
-.card h3{margin-bottom:9px}
-.card p{font-size:17px;line-height:1.5}
-.card .ico{font-size:26px;line-height:1;margin-bottom:12px;display:block}
-.card .num{font:700 13px/1 var(--mono);color:var(--accent);letter-spacing:.09em;margin-bottom:11px;display:block}
+.card h3{margin-bottom:var(--sp-n2)}
+.card p{font-size:var(--fs-n1);line-height:1.46}
+.card .ico{font-size:var(--fs-2);line-height:1;margin-bottom:var(--sp-n2);display:block}
+.card .num{font:700 var(--fs-n3)/1 var(--mono);color:var(--accent);letter-spacing:.08em;margin-bottom:var(--sp-n2);display:block}
 .card.tint2 .num{color:var(--accent-2)}
 
-.stat .v{font-size:44px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--fg)}
-.stat .v .un{font-size:20px;font-weight:600;color:var(--muted);margin-left:4px}
-.stat .k{margin-top:9px;font-size:16px;line-height:1.38;color:var(--muted)}
+/* Variante compacta: para columnas con varias tarjetas apiladas
+   (p.ej. varios bloques de una interfaz), donde el texto normal
+   de tarjeta no entra en el alto disponible. */
+.card.tight{padding:var(--sp-n2) var(--sp-n1)}
+.card.tight .num{margin-bottom:4px}
+.card.tight h3{font-size:var(--fs-0);margin-bottom:4px}
+.card.tight p{font-size:var(--fs-n2);line-height:1.34}
+
+.stat .v{font-size:var(--fs-5);font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--fg)}
+.stat .v .un{font-size:var(--fs-0);font-weight:600;color:var(--muted);margin-left:5px}
+.stat .k{margin-top:var(--sp-n2);font-size:var(--fs-n1);line-height:1.34;color:var(--muted)}
 .stat.acc .v{color:var(--accent)}
 .stat.acc2 .v{color:var(--accent-2)}
 .stat.warn .v{color:var(--warn)}
 
-ul.bul{list-style:none;display:flex;flex-direction:column;gap:14px}
-ul.bul li{position:relative;padding-left:29px;font-size:19px;line-height:1.48;color:var(--muted)}
+ul.bul{list-style:none;display:flex;flex-direction:column;gap:var(--sp-n2)}
+ul.bul li{position:relative;padding-left:30px;font-size:var(--fs-0);line-height:1.42;color:var(--muted)}
 ul.bul li::before{
-  content:"";position:absolute;left:6px;top:.6em;width:8px;height:8px;border-radius:2px;
+  content:"";position:absolute;left:6px;top:.58em;width:9px;height:9px;border-radius:2px;
   background:var(--accent);transform:rotate(45deg);
 }
 ul.bul.c2 li::before{background:var(--accent-2)}
 ul.bul.check li::before{background:var(--ok)}
 ul.bul.no li::before{background:var(--dim)}
-ul.bul.tight{gap:10px}
-ul.bul.sm li{font-size:17.5px}
-ul.bul li b{color:var(--fg);font-weight:650}
+ul.bul.tight{gap:calc(var(--sp-n2) * 0.75)}
+ul.bul.sm li{font-size:var(--fs-n1)}
+ul.bul li b{color:var(--fg);font-weight:700}
 
-.chips{display:flex;flex-wrap:wrap;gap:9px}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
 .chip{
-  font:700 13.5px/1 var(--mono);letter-spacing:.02em;
-  padding:8px 14px;border-radius:999px;
+  font:700 var(--fs-n3)/1 var(--mono);letter-spacing:.02em;
+  padding:9px 15px;border-radius:999px;
   background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
 }
 .chip.a{background:var(--accent-soft);border-color:var(--accent-border);color:var(--chip-a-fg)}
@@ -265,17 +313,17 @@ ul.bul li b{color:var(--fg);font-weight:650}
 .eq{
   background:linear-gradient(180deg,var(--panel-2),var(--panel));
   border:1px solid var(--line);border-left:3px solid var(--accent);
-  border-radius:10px;padding:18px 22px;
-  font-family:var(--mono);font-size:19.5px;line-height:1.7;color:var(--fg);
+  border-radius:10px;padding:var(--sp-n1) var(--sp-0);
+  font-family:var(--mono);font-size:var(--fs-1);line-height:1.62;color:var(--fg);
   overflow-x:auto;
 }
 .eq.c2{border-left-color:var(--accent-2)}
-.eq.sm{font-size:17.5px;padding:15px 18px}
-.eq .lbl{display:block;font-size:12.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.eq.sm{font-size:var(--fs-0);padding:calc(var(--sp-n1) - 2px) var(--sp-n1)}
+.eq .lbl{display:block;font-size:var(--fs-n3);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:var(--sp-n2)}
 .eq sub{font-size:.66em;color:var(--muted)}
 .eq .hi{color:var(--accent)}
 .eq .hi2{color:var(--accent-2)}
-.eq .note{display:block;margin-top:10px;font-family:var(--sans);font-size:14.5px;line-height:1.48;color:var(--dim)}
+.eq .note{display:block;margin-top:var(--sp-n2);font-family:var(--sans);font-size:var(--fs-n2);line-height:1.42;color:var(--dim)}
 
 .fig{display:flex;flex-direction:column;gap:10px;min-height:0}
 .fig .box{
@@ -291,21 +339,21 @@ ul.bul li b{color:var(--fg);font-weight:650}
   background:rgba(10,13,19,.82);border:1px solid var(--line);border-radius:6px;padding:2px 7px;
 }
 .fig .box:hover::after{opacity:.9}
-.fig figcaption{font-size:15px;line-height:1.42;color:var(--dim);flex:0 0 auto}
+.fig figcaption{font-size:var(--fs-n2);line-height:1.4;color:var(--dim);flex:0 0 auto}
 .fig figcaption b{color:var(--muted);font-weight:600}
 
-table.t{width:100%;border-collapse:collapse;font-size:16.5px}
+table.t{width:100%;border-collapse:collapse;font-size:var(--fs-n1)}
 table.t th{
-  text-align:left;padding:10px 13px;font:700 12.5px/1.3 var(--mono);
-  letter-spacing:.11em;text-transform:uppercase;color:var(--dim);
+  text-align:left;padding:11px 14px;font:700 var(--fs-n3)/1.3 var(--mono);
+  letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
   border-bottom:1px solid var(--line-2);
 }
-table.t td{padding:10px 13px;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top;line-height:1.4}
+table.t td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top;line-height:1.38}
 table.t tr:last-child td{border-bottom:0}
-table.t td.k{font-family:var(--mono);color:var(--accent-2);font-size:14.5px;white-space:nowrap}
+table.t td.k{font-family:var(--mono);color:var(--accent-2);font-size:var(--fs-n2);white-space:nowrap}
 table.t td b{color:var(--fg);font-weight:600}
-table.t.sm{font-size:15px}
-table.t.sm td{padding:8px 12px}
+table.t.sm{font-size:var(--fs-n2)}
+table.t.sm td{padding:9px 13px}
 
 /* ============================================================
    FRAGMENTOS (revelado paso a paso)
@@ -336,10 +384,11 @@ table.t.sm td{padding:8px 12px}
 
 #notes{
   position:fixed;left:18px;bottom:14px;right:330px;z-index:60;
+  --fg:#f5f7fb;--muted:#c3cbdb;--dim:#93a0b8;
   background:rgba(10,13,19,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  border:1px solid var(--line);border-left:3px solid var(--accent-2);
+  border:1px solid rgba(255,255,255,.14);border-left:3px solid var(--accent-2);
   border-radius:10px;padding:12px 16px;
-  font-size:14px;line-height:1.55;color:var(--muted);
+  font-size:var(--fs-n2);line-height:1.5;color:var(--muted);
   display:none;max-height:126px;overflow:auto;
 }
 body.show-notes #notes{display:block}
@@ -351,24 +400,27 @@ body.show-notes #notes{display:block}
    ============================================================ */
 #overview{
   position:fixed;inset:0;z-index:80;background:rgba(6,8,13,.975);
+  --panel:rgba(255,255,255,.055);--panel-2:rgba(255,255,255,.095);
+  --line:rgba(255,255,255,.15);--line-2:rgba(255,255,255,.26);
+  --fg:#f5f7fb;--muted:#c3cbdb;--dim:#93a0b8;--accent-soft:rgba(255,140,66,.2);
   display:none;padding:40px;overflow:auto;
 }
 body.overview #overview{display:block}
 #ovGrid{display:grid;grid-template-columns:repeat(5,1fr);gap:15px;max-width:1480px;margin:0 auto}
 .ov-item{
-  border:1px solid var(--line);border-radius:10px;padding:13px;cursor:pointer;
+  border:1px solid var(--line);border-radius:10px;padding:14px;cursor:pointer;
   background:var(--panel);transition:border-color .18s,background .18s,transform .18s;
   min-height:84px;display:flex;flex-direction:column;gap:7px;text-align:left;
   font-family:inherit;color:inherit;
 }
 .ov-item:hover{border-color:var(--line-2);background:var(--panel-2);transform:translateY(-2px)}
 .ov-item.cur{border-color:var(--accent);background:var(--accent-soft)}
-.ov-item .i{font:700 10.5px/1 var(--mono);color:var(--dim);letter-spacing:.1em}
+.ov-item .i{font:700 var(--fs-n3)/1 var(--mono);color:var(--dim);letter-spacing:.1em}
 .ov-item.cur .i{color:var(--accent)}
-.ov-item .t{font-size:13.5px;line-height:1.35;color:var(--fg);font-weight:600}
+.ov-item .t{font-size:var(--fs-n2);line-height:1.32;color:var(--fg);font-weight:600}
 #ovHead{max-width:1480px;margin:0 auto 24px;display:flex;align-items:baseline;gap:16px}
-#ovHead h3{font-size:19px}
-#ovHead span{font:600 12.5px/1 var(--mono);color:var(--dim)}
+#ovHead h3{font-size:var(--fs-1);color:#f5f7fb}
+#ovHead span{font:600 var(--fs-n3)/1 var(--mono);color:#93a0b8}
 
 /* ============================================================
    AYUDA
@@ -384,32 +436,38 @@ body.show-help #help{display:flex}
 }
 #help h3{margin-bottom:20px}
 #help dl{display:grid;grid-template-columns:auto 1fr;gap:12px 22px;align-items:center}
-#help dt{font:600 12.5px/1 var(--mono);color:var(--accent-2);white-space:nowrap}
-#help dd{font-size:14.5px;color:var(--muted)}
-#help .foot{margin-top:24px;font-size:12.5px;color:var(--dim)}
+#help dt{font:600 var(--fs-n3)/1 var(--mono);color:var(--accent-2);white-space:nowrap}
+#help dd{font-size:var(--fs-n2);color:var(--muted)}
+#help .foot{margin-top:24px;font-size:var(--fs-n3);color:var(--dim)}
 
 /* ============================================================
    LIGHTBOX
    ============================================================ */
 #lb{
   position:fixed;inset:0;z-index:100;background:rgba(6,8,13,.965);
+  --line:rgba(255,255,255,.16);
   display:none;align-items:center;justify-content:center;padding:42px;cursor:zoom-out;
 }
 body.lb #lb{display:flex}
 #lb img{max-width:100%;max-height:87%;object-fit:contain;border-radius:10px;border:1px solid var(--line)}
-#lbCap{position:absolute;left:0;right:0;bottom:24px;text-align:center;font-size:14.5px;color:var(--muted);padding:0 60px}
+#lbCap{position:absolute;left:0;right:0;bottom:24px;text-align:center;font-size:var(--fs-n2);color:#c3cbdb;padding:0 60px}
 
 /* ============================================================
    DIAGRAMAS SVG
+   Los diagramas tienen geometría fija (cajas y coordenadas a mano),
+   así que su texto NO sigue la escala tipográfica general ni el
+   control de tamaño de fuente del usuario — si escalaran con el
+   resto, el texto se sale de las cajas. Tamaños ajustados a mano
+   para el ancho de cada caja.
    ============================================================ */
 svg.diag{width:100%;height:100%;display:block;overflow:visible}
 svg.diag text{font-family:var(--sans);fill:var(--fg)}
 svg.diag .lb{font-family:var(--mono);font-size:14px;font-weight:700;fill:var(--muted);letter-spacing:.03em}
-svg.diag .lb-s{font-family:var(--mono);font-size:12px;font-weight:700;fill:var(--dim);letter-spacing:.05em}
+svg.diag .lb-s{font-family:var(--mono);font-size:12.5px;font-weight:700;fill:var(--dim);letter-spacing:.05em}
 svg.diag .lb-a{fill:var(--accent)}
 svg.diag .lb-b{fill:var(--accent-2)}
 svg.diag .ti{font-size:16px;font-weight:700;fill:var(--fg)}
-svg.diag .ti-s{font-size:13px;font-weight:600;fill:var(--muted)}
+svg.diag .ti-s{font-size:13.5px;font-weight:600;fill:var(--muted)}
 svg.diag .bx{fill:var(--diag-fill);stroke:var(--line);stroke-width:1.2}
 svg.diag .bx-a{fill:var(--accent-soft);stroke:var(--accent-border);stroke-width:1.3}
 svg.diag .bx-b{fill:var(--accent-2-soft);stroke:var(--accent-2-border);stroke-width:1.3}
@@ -428,14 +486,14 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
 .pipe{display:flex;align-items:stretch;gap:0}
 .pipe .step{
   flex:1;background:var(--panel);border:1px solid var(--line);
-  padding:16px 18px;position:relative;
+  padding:18px 20px;position:relative;
 }
 .pipe .step:first-child{border-radius:12px 0 0 12px}
 .pipe .step:last-child{border-radius:0 12px 12px 0}
 .pipe .step + .step{border-left:0}
-.pipe .step .n{font:700 11.5px/1 var(--mono);color:var(--accent);letter-spacing:.11em;display:block;margin-bottom:8px}
-.pipe .step .t{font-size:16px;font-weight:650;color:var(--fg);line-height:1.25;margin-bottom:6px}
-.pipe .step .d{font-size:14px;line-height:1.4;color:var(--dim)}
+.pipe .step .n{font:700 var(--fs-n3)/1 var(--mono);color:var(--accent);letter-spacing:.1em;display:block;margin-bottom:8px}
+.pipe .step .t{font-size:var(--fs-n1);font-weight:650;color:var(--fg);line-height:1.22;margin-bottom:6px}
+.pipe .step .d{font-size:var(--fs-n2);line-height:1.36;color:var(--dim)}
 .pipe .step::after{
   content:"";position:absolute;right:-7px;top:50%;transform:translateY(-50%) rotate(45deg);
   width:12px;height:12px;background:var(--bg);border-top:1px solid var(--line);border-right:1px solid var(--line);
@@ -447,12 +505,12 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
 .bar > i{display:block;height:100%;border-radius:5px;background:var(--accent);width:0;transition:width .9s cubic-bezier(.22,.9,.3,1)}
 .frag.on .bar > i{width:var(--w,50%)}
 
-.mt8{margin-top:8px}.mt12{margin-top:12px}.mt16{margin-top:14px}.mt20{margin-top:18px}
-.mt26{margin-top:22px}.mt34{margin-top:28px}
-.mb10{margin-bottom:10px}.mb16{margin-bottom:14px}.mb20{margin-bottom:17px}
+.mt8{margin-top:10px}.mt12{margin-top:15px}.mt16{margin-top:20px}.mt20{margin-top:24px}
+.mt26{margin-top:30px}.mt34{margin-top:38px}
+.mb10{margin-bottom:13px}.mb16{margin-bottom:20px}.mb20{margin-bottom:24px}
 .center{text-align:center}
-.small{font-size:17px}
-.tiny{font-size:15px;line-height:1.45}
+.small{font-size:var(--fs-n1)}
+.tiny{font-size:var(--fs-n2);line-height:1.42}
 .fs{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
 .rowc{display:flex;align-items:center;gap:14px}
 .sep{height:1px;background:var(--line);margin:18px 0}
@@ -460,10 +518,17 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
 </head>
 <body>
 <div id="topbar"><div id="prog"></div></div>
-<div id="themeSwitch">
-  <button type="button" data-theme="a">Claro</button>
-  <button type="button" data-theme="b">Cálido</button>
-  <button type="button" data-theme="c">Contraste</button>
+<div id="toolbar">
+  <div id="fontScale">
+    <button type="button" id="fsDown" aria-label="Achicar fuente">A−</button>
+    <span class="pct" id="fsPct">100%</span>
+    <button type="button" id="fsUp" aria-label="Agrandar fuente">A+</button>
+  </div>
+  <div id="themeSwitch">
+    <button type="button" data-theme="a">Claro</button>
+    <button type="button" data-theme="b">Cálido</button>
+    <button type="button" data-theme="c">Contraste</button>
+  </div>
 </div>
 <div id="stage">
 <!-- ============================================================
@@ -569,7 +634,7 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
     </div>
     <div class="frag mt26">
       <div class="card tint2">
-        <p style="font-size:19px"><strong>El punto 05 es la clave del diseño:</strong> no se entrena con un mando genérico y después se cambia de interfaz — se entrena con <em>exactamente</em> el mismo hardware con el que se va a trabajar.</p>
+        <p style="font-size:var(--fs-1)"><strong>El punto 05 es la clave del diseño:</strong> no se entrena con un mando genérico y después se cambia de interfaz — se entrena con <em>exactamente</em> el mismo hardware con el que se va a trabajar.</p>
       </div>
     </div>
   </div>
@@ -608,8 +673,7 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <span class="num" style="color:var(--dim)">FUERA DE ALCANCE</span>
         <ul class="bul no tight sm">
           <li>Háptica proporcional a la fuerza de contacto</li>
-          <li><i>Motion planning</i> autónomo</li>
-          <li>Integración física con el robot electrohidráulico real <span class="tiny">(trabajo futuro)</span></li>
+          <li>Integración física con el robot real <span class="tiny">(trabajo futuro)</span></li>
           <li>Certificación normativa industrial</li>
         </ul>
       </div>
@@ -873,22 +937,22 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <figcaption>Panel de interfaz en ejecución, visible durante toda la sesión de entrenamiento.</figcaption>
       </figure>
       <div>
-        <div class="card tint frag mb16">
+        <div class="card tint tight frag mb10">
           <span class="num">BLOQUE 1</span>
           <h3>Acciones de control (PID)</h3>
           <p>Acción de control en <code>°/s²</code> calculada por el controlador PID de cada articulación <b>J1&ndash;J6</b>, en tiempo real.</p>
         </div>
-        <div class="card frag mb16">
+        <div class="card tight frag mb10">
           <span class="num">BLOQUE 2</span>
           <h3>Guía de controles</h3>
           <p>Mapeo de botones y palancas del joystick, siempre a la vista como referencia inmediata del operador.</p>
         </div>
-        <div class="card frag mb16">
+        <div class="card tight frag mb10">
           <span class="num">BLOQUE 3</span>
           <h3>Métricas de desempeño</h3>
           <p>Colisiones, tiempo de operación, operaciones completadas y masa agarrada.</p>
         </div>
-        <div class="card tint2 frag">
+        <div class="card tint2 tight frag">
           <span class="num">ESQUINA INFERIOR</span>
           <h3>Cámara del gripper</h3>
           <p>Sub-ventana con la vista en tiempo real desde una cámara montada sobre el efector, que facilita el <strong>posicionamiento preciso</strong> de la garra sobre las celdas. La lectura grande es la <strong>distancia al objetivo</strong>.</p>
@@ -936,9 +1000,6 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <div class="card frag mb16">
           <h3>Modo J6 exclusivo</h3>
           <p>Doble clic: la muñeca gira aislada, con un límite de velocidad propio de <b>±45 °/s</b>.</p>
-        </div>
-        <div class="frag">
-          <p class="tiny">Al ser <code>IsCameraMode</code> una propiedad <b>estática</b> de <code>JoystickAdapter</code>, el componente <code>CameraJoystickController</code> la consulta sin necesitar una referencia explícita entre objetos.</p>
         </div>
       </div>
     </div>
@@ -1012,7 +1073,7 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <div class="frag mt16">
           <div class="eq sm">
             <span class="lbl">Dirección lateral — MoveX</span>
-            d̂<sub>X</sub> = ( Ŷ<sub>mundo</sub> × d̂<sub>Z</sub> ) ⁄ ‖·‖
+            d̂<sub>X</sub> = ( d̂<sub>Z</sub> × Ŷ<sub>mundo</sub> ) ⁄ ‖·‖
             <span class="note">Producto vectorial con el eje +Y del mundo. También con signo positivo fijo.</span>
           </div>
         </div>
@@ -1021,9 +1082,6 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
             <h3>Resultado</h3>
             <p>Empujar el analógico <strong>hacia adelante</strong> siempre mueve el TCP en la dirección que apunta hacia él desde la cámara; empujarlo <strong>a la derecha</strong> lo desplaza a su derecha geométrica — con independencia de la orientación del efector o de dónde esté la cámara.</p>
           </div>
-        </div>
-        <div class="frag mt16">
-          <p class="tiny">Implementado en <code>JoystickAdapter.RemapAxesFromCamera()</code>.</p>
         </div>
       </div>
     </div>
@@ -1041,18 +1099,6 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
   </div>
   <div class="body">
     <div class="frag">
-      <div class="eq" style="font-size:21px">
-        <span class="lbl">Incremento de posición del TCP</span>
-        Δ<b>p</b> = ( d̂<sub>X</sub>·u<sub>X</sub> + Ŷ<sub>mundo</sub>·u<sub>Y</sub> + d̂<sub>Z</sub>·u<sub>Z</sub> ) · <span class="hi2">v</span> · <span class="hi">λ<sub>payload</sub></span> · <span class="hi">λ<sub>prox</sub></span> · Δt
-      </div>
-    </div>
-    <div class="g4 mt26">
-      <div class="card frag"><h3><code>u<sub>X</sub>, u<sub>Y</sub>, u<sub>Z</sub></code></h3><p>Valores de las acciones <code>MoveX/Y/Z</code>, en el rango <b>[−1, 1]</b>.</p></div>
-      <div class="card tint2 frag"><h3><code>v</code> — velocidad máxima</h3><p>Configurada en el Inspector. Los versores <b>d̂<sub>X</sub></b> y <b>d̂<sub>Z</sub></b> vienen del remapeo geométrico.</p></div>
-      <div class="card tint frag"><h3><code>λ<sub>payload</sub></code> ∈ (0, 1]</h3><p>Penalización proporcional a la <b>masa agarrada</b>. Produce el efecto perceptible de <em>&laquo;carga pesada = movimiento más lento&raquo;</em>.</p></div>
-      <div class="card tint frag"><h3><code>λ<sub>prox</sub></code> ∈ [0.5, 1]</h3><p>Frenado progresivo por <b>proximidad a obstáculos</b>. Nunca llega a cero.</p></div>
-    </div>
-    <div class="frag mt26">
       <div class="pipe">
         <div class="step"><span class="n">01</span><div class="t">Δp sobre la pose actual</div><div class="d">El incremento se aplica sobre la pose vigente del TCP.</div></div>
         <div class="step"><span class="n">02</span><div class="t">Solver IK de Flange</div><div class="d">Cinemática inversa analítica → <code>JointTarget</code>.</div></div>
@@ -1116,9 +1162,6 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
           <h3>Al alcanzar un límite físico</h3>
           <p>La posición articular se recorta contra los <strong>límites físicos</strong> de cada eje. Si un límite se alcanza, la velocidad <strong>se frena a cero</strong> y el integrador del PID correspondiente <strong>se reinicia</strong>, para evitar <i>windup</i>.</p>
         </div>
-        <div class="frag mt16">
-          <p class="tiny">El resultado final se aplica con <code>MechanicalGroup.SetJoints()</code>, siempre como ángulos articulares en grados.</p>
-        </div>
       </div>
     </div>
   </div>
@@ -1138,23 +1181,9 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
     <div class="g-5-7">
       <div>
         <div class="frag">
-          <div class="eq">
-            <span class="lbl">Inercia efectiva de la articulación i</span>
-            J<sub>eff</sub>[i] = Σ<sub>j ≥ i</sub> m<sub>j</sub> · d<sub>ij</sub>²
-            <span class="note">d<sub>ij</sub> = distancia perpendicular entre el <b>eje de giro</b> de la articulación i (en mundo) y el <b>centro de masa</b> del eslabón j (también en mundo).</span>
-          </div>
-        </div>
-        <div class="frag mt20">
           <div class="card tint2">
             <h3>Objeto agarrado como masa puntual</h3>
             <p>Si el gripper sostiene algo, se suman <code>GrabbedMass</code> y <code>GrabbedWorldPosition</code> a la J<sub>eff</sub> de <strong>cada</strong> articulación, como masa puntual ubicada en el <code>graspPoint</code>.</p>
-          </div>
-        </div>
-        <div class="frag mt20">
-          <div class="eq c2 sm">
-            <span class="lbl">Normalización antes de integrar</span>
-            j<sub>norm</sub> = max( J<sub>eff</sub>[i] / J<sub>ref</sub> , 0.05 )
-            <span class="note">El torque se divide por j<sub>norm</sub> para obtener la aceleración angular.</span>
           </div>
         </div>
       </div>
@@ -1248,23 +1277,20 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         </svg>
       </div>
       <div>
-        <div class="card tint frag mb16">
+        <div class="card tint tight frag mb10">
           <span class="num">CAPA 1</span>
           <h3>Frenado por proximidad</h3>
           <p>A medida que la distancia cae bajo <code>ThresholdMeters</code> (<b>30 cm</b>), la velocidad cartesiana se interpola linealmente hasta un piso de <b>50 %</b> — <strong>en cualquier dirección</strong>, y sin llegar nunca a cero.</p>
         </div>
-        <div class="card danger frag mb16">
+        <div class="card danger tight frag mb10">
           <span class="num" style="color:var(--danger)">CAPA 2</span>
           <h3>Bloqueo de descenso</h3>
           <p><code>ApplyDescentLimit()</code> — bloqueo estricto que <strong>solo</strong> actúa al descender con la garra cerrada: recorta el paso vertical al margen restante (<b>5 cm</b>), deteniendo el descenso justo <em>sobre</em> la superficie.</p>
         </div>
-        <div class="card tint2 frag mb16">
+        <div class="card tint2 tight frag mb10">
           <span class="num">CAPA 3</span>
           <h3>Veto anticolisión</h3>
           <p><code>ApplyCollisionVeto()</code> traza un <code>SphereCastNonAlloc</code> desde el efector a lo largo de la dirección de movimiento contra el <i>layer</i> <b>Entorno</b>, y recorta el paso antes del contacto. Ignora el propio robot, la pieza agarrada y las superficies muy horizontales.</p>
-        </div>
-        <div class="frag">
-          <p class="tiny">Ambos umbrales son ajustables <strong>en tiempo real</strong> desde el menú de pausa, ciclando entre presets, y se persisten entre sesiones en <code>PlayerPrefs</code>.</p>
         </div>
       </div>
     </div>
@@ -1282,25 +1308,6 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
     <p class="sub">La apertura y cierre del OnRobot RG2 se controla con un único botón, gestionado por <code>Ctrl_OnRobotRG2_Custom</code>.</p>
   </div>
   <div class="body">
-    <div class="g3 mb20">
-      <div class="card frag">
-        <span class="num">MOVIMIENTO</span>
-        <h3>De carrera a ángulo</h3>
-        <p>La carrera (<i>stroke</i>, <b>0&ndash;100 mm</b>) se convierte a ángulo de servo con un polinomio de ajuste (<code>Polyval</code>) y se interpola con <code>Mathf.MoveTowards</code>, rotando los seis <code>Rigidbody</code> de los dedos vía <code>MoveRotation</code>.</p>
-        <div class="chips mt12"><span class="chip a">Apertura 120 mm/s</span><span class="chip a">Cierre 140 mm/s</span></div>
-      </div>
-      <div class="card tint frag">
-        <span class="num">CONDICIÓN DE AGARRE</span>
-        <h3>Dos dedos + ventana de cierre</h3>
-        <p>Un objeto solo se agarra si existe una <strong>ventana de cierre explícita</strong> (<code>isClosing</code>) <em>y</em> el objeto registra <strong>contacto simultáneo de ambos dedos</strong> (<code>HasOpposingInnerContacts()</code>).</p>
-        <p class="mt12"><strong>Tocar un objeto con la garra ya cerrada nunca lo adhiere.</strong></p>
-      </div>
-      <div class="card tint2 frag">
-        <span class="num">DETECCIÓN</span>
-        <h3>GripperTriggerForwarder</h3>
-        <p>Cada dedo lleva un <i>forwarder</i> en su cara interna que detecta por <i>trigger</i> los objetos con tag <code>&quot;Agarrable&quot;</code>, <strong>recorriendo la jerarquía de <code>Transform</code> hacia arriba</strong> desde el colisionador detectado, y notifica a <code>NotifyFingerContact()</code>.</p>
-      </div>
-    </div>
     <div class="g-6-4">
       <div class="frag">
         <div class="pipe">
@@ -1313,9 +1320,6 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <h3>Al soltar</h3>
         <p>Se restauran masa y físicas. <code>MoveGrabbedObjectToSafeReleaseHeight()</code> corrige la posición si la suelta ocurriera por debajo del piso o de la altura mínima de recogida.</p>
       </div>
-    </div>
-    <div class="frag mt20">
-      <p class="tiny">Mantener el botón <b>1 segundo</b> no cierra la garra: dispara el <i>homing</i> de J6 a su cero físico de <b>17.7°</b> (<code>JoystickAdapter.ResetJ6ToZero()</code>) — la misma acción del botón Cuadrado.</p>
     </div>
   </div>
   <div class="notes-src">El diseño de agarre por doble contacto + ventana de cierre es lo que evita el clásico bug de simulador donde el objeto se te pega solo con rozarlo. Es más trabajo, pero es lo que hace que el entrenamiento enseñe a agarrar bien.</div>
@@ -1350,20 +1354,14 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <p class="tiny mt12">No participan del frenado ni del HUD. Su única función es <strong>disparar el motor háptico</strong> ante un obstáculo cercano en su dirección, como aviso temprano de <b>colisión lateral</b> durante el traslado del TCP.</p>
       </div>
     </div>
-    <div class="g-6-4">
-      <div class="card tint frag">
-        <span class="num">ACTIVACIÓN DE LA VIBRACIÓN — CON HISTÉRESIS</span>
-        <div class="rowc mt12" style="gap:26px">
-          <div class="stat acc"><div class="v">0.15<span class="un">m</span></div><div class="k">Se enciende por debajo de <code>vibrationStartDistance</code></div></div>
-          <div style="font-size:26px;color:var(--dim)">&rarr;</div>
-          <div class="stat"><div class="v">0.18<span class="un">m</span></div><div class="k">Se apaga recién al superar este umbral</div></div>
-        </div>
-        <p class="tiny mt16">La histéresis evita el parpadeo del motor cuando la distancia oscila alrededor del umbral. Los <strong>cinco sensores actúan de forma independiente</strong>: cualquiera puede activar la vibración vía <code>JoystickVibrationHidOutput.SetMotor(true)</code>. Solo opera cuando <strong>no hay ningún objeto agarrado</strong>.</p>
+    <div class="card tint frag">
+      <span class="num">ACTIVACIÓN DE LA VIBRACIÓN — CON HISTÉRESIS</span>
+      <div class="rowc mt12" style="gap:26px">
+        <div class="stat acc"><div class="v">0.15<span class="un">m</span></div><div class="k">Se enciende por debajo de <code>vibrationStartDistance</code></div></div>
+        <div style="font-size:var(--fs-3);color:var(--dim)">&rarr;</div>
+        <div class="stat"><div class="v">0.18<span class="un">m</span></div><div class="k">Se apaga recién al superar este umbral</div></div>
       </div>
-      <figure class="fig frag" style="height:260px">
-        <div class="box"><img src="../Img/codigo/Sec4.4/4.4-09-distancesensor-measurecone.png" alt="Método MeasureWithCone"></div>
-        <figcaption><code>MeasureWithCone()</code> — muestreo cónico usado por los cuatro sensores laterales.</figcaption>
-      </figure>
+      <p class="tiny mt16">La histéresis evita el parpadeo del motor cuando la distancia oscila alrededor del umbral. Los <strong>cinco sensores actúan de forma independiente</strong>: cualquiera puede activar la vibración vía <code>JoystickVibrationHidOutput.SetMotor(true)</code>. Solo opera cuando <strong>no hay ningún objeto agarrado</strong>.</p>
     </div>
   </div>
   <div class="notes-src">La cámara del gripper (<code>GripperTopCameraFollow</code>) complementa esto: sigue al efector desde arriba, mirando siempre hacia abajo, con el vector <i>up</i> proyectado desde el <i>forward</i> del efector — así la vista gira solidariamente con J6.</div>
@@ -1438,10 +1436,9 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <text class="ti-s" x="1065" y="222" text-anchor="middle">VPN entre PC, MATLAB y teléfono</text>
       </svg>
     </div>
-    <div class="g3 mt20">
+    <div class="g2 mt20">
       <div class="card frag"><h3>Múltiples clientes, cero reconfiguración</h3><p>Python, MATLAB y un dashboard web operan <strong>simultáneamente</strong> sin tocar el servidor.</p></div>
       <div class="card frag"><h3>Limpieza opcional</h3><p><code>_autoCleanupEnabled</code> (desactivado por defecto) elimina suscriptores tras <b>15 s</b> sin <i>keep-alive</i>.</p></div>
-      <div class="card tint2 frag"><h3><code>CultureInfo.InvariantCulture</code></h3><p>Fuerza el <strong>punto decimal</strong> en la serialización, evitando conflictos con la configuración regional del SO.</p></div>
     </div>
   </div>
   <div class="notes-src">El detalle de <code>InvariantCulture</code> parece menor pero es el clásico bug que rompe la interoperabilidad: en configuración regional española, un float se serializa con coma y el parser del cliente lo corta mal. El HUD tiene un panel &quot;Clientes conectados&quot; que lista las IPs suscriptas en vivo.</div>
@@ -1478,11 +1475,6 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
         <figcaption><b>04 · Dashboard web</b> — servidor HTTP embebido, <i>gauges</i> J1&ndash;J6 y vista 3D interactiva.</figcaption>
       </figure>
     </div>
-    <div class="g3 mt26">
-      <div class="card frag"><h3>Por qué <code>pyplot</code> y no <i>Swift</i></h3><p>El backend Swift (three.js) exige geometría STL/URDF. El modelo puramente cinemático (<code>DHRobot</code>) solo es graficable con <code>pyplot</code>, que dibuja el robot como <i>stick figure</i> desde la cinemática directa — igual que MATLAB.</p></div>
-      <div class="card frag"><h3>Drenado de buffer</h3><p>Ambos visores <strong>vacían el buffer de recepción</strong> en cada ciclo y procesan solo el paquete más reciente, para evitar el <i>lag</i> acumulado.</p></div>
-      <div class="card tint2 frag"><h3>Mismo dashboard, dos pantallas</h3><p>La misma aplicación se ejecuta local en la PC o se sirve al teléfono por Tailscale, con la vista 3D y los <i>gauges</i> en formato vertical.</p></div>
-    </div>
   </div>
   <div class="notes-src">Si hay tiempo, mostrar el dashboard en el celular — es el que más impresiona en vivo. Los cuatro clientes corriendo a la vez es la demostración de que la arquitectura de suscripción funciona.</div>
 </section>
@@ -1503,90 +1495,16 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
       <div class="card stat frag"><div class="v">Operaciones</div><div class="k">Cantidad de ciclos completados</div></div>
       <div class="card stat frag"><div class="v">Masa</div><div class="k">Masa del objeto sostenido, reportada en vivo</div></div>
     </div>
-    <div class="g-5-7">
-      <div>
-        <div class="card tint2 frag mb16">
-          <h3><code>PerformanceMetricsTracker</code></h3>
-          <p>Observa las transiciones de <code>GripperController.IsHoldingObject</code>: al agarrar arranca un cronómetro y, al soltar, calcula la duración y suma un contador de operaciones completadas.</p>
-        </div>
-        <div class="card frag">
-          <h3><code>GripperCollisionCounter</code></h3>
-          <p>Detecta contactos por <i>trigger</i> contra cualquier objeto <strong>sin</strong> el tag <code>&quot;Agarrable&quot;</code>, <strong>deduplicando por objeto</strong> para no contar dos veces un mismo contacto sostenido por varios colliders, e ignorando al propio robot con un <code>Ignore Root</code> configurable.</p>
-        </div>
-      </div>
-      <div class="g-6-4" style="gap:20px">
-        <div class="card tint frag" style="align-self:stretch">
-          <span class="num">DECISIÓN DE DISEÑO</span>
-          <h3>¿Por qué por <i>trigger</i> y no por colisión sólida?</h3>
-          <p>El <code>Rigidbody</code> del gripper es <strong>cinemático</strong> y los obstáculos del entorno normalmente <strong>no tienen <code>Rigidbody</code></strong>. Para esa combinación Unity <strong>no garantiza</strong> que se dispare <code>OnCollisionEnter</code> — así que contar por colisión sólida perdería eventos.</p>
-        </div>
-        <figure class="fig frag" style="height:300px">
-          <div class="box"><img src="../Img/codigo/Metricas/4.1-metrics-canvas-hud.png" alt="Bloque de métricas en el HUD"></div>
-          <figcaption>Bloque <b>Métricas de Desempeño</b> del Canvas.</figcaption>
-        </figure>
-      </div>
-    </div>
+    <figure class="fig frag" style="height:420px;max-width:460px;margin:0 auto">
+      <div class="box"><img src="../Img/codigo/Metricas/4.1-metrics-canvas-hud.png" alt="Bloque de métricas en el HUD"></div>
+      <figcaption class="center">Bloque <b>Métricas de Desempeño</b> del Canvas.</figcaption>
+    </figure>
   </div>
   <div class="notes-src">Los cuatro valores se muestran en <code>PerformanceMetricsPanel</code>, con el mismo patrón de clonado de fila plantilla que usan los paneles de Acciones de Control y Guía de Controles.</div>
 </section>
 
 <!-- ============================================================
-     22 · AUTORÍA DE CONTENIDO
-     ============================================================ -->
-<section class="slide" data-title="Autoría procedural de contenido">
-  <div class="s-head">
-    <div class="kicker">4.6 &middot; Herramientas de autoría</div>
-    <h2>Los props no se modelaron a mano</h2>
-    <p class="sub">Caja de batería, cajón de madera y rack Eternity se generan con un <strong>pipeline reproducible de dos etapas</strong>.</p>
-  </div>
-  <div class="body">
-    <div class="g2 mb20">
-      <div class="card tint frag">
-        <span class="num">ETAPA 1 — PYTHON</span>
-        <h3>Atlas de textura procedural</h3>
-        <p>Un script por prop (<i>Pillow</i> + <i>NumPy</i>) genera un atlas <b>2×2</b> de albedo y su mapa de normales, con <strong>cada celda mapeada a una cara distinta</strong> del objeto.</p>
-        <div class="chips mt12">
-          <span class="chip a">generar_textura_bateria.py</span>
-          <span class="chip a">generar_textura_caja_madera.py</span>
-          <span class="chip a">generar_textura_rack.py</span>
-        </div>
-      </div>
-      <div class="card tint2 frag">
-        <span class="num">ETAPA 2 — EDITOR DE UNITY</span>
-        <h3>Herramienta de mesh por prop</h3>
-        <p>Construye un mesh con <strong>UV por cara</strong> mapeadas exactamente a esas celdas &mdash; a diferencia del <code>Cube</code> nativo de Unity, que manda <strong>las seis caras al mismo cuadrado UV 0..1</strong>&mdash; y lo aplica junto al material.</p>
-        <div class="chips mt12">
-          <span class="chip b">CajaBateriaMeshTool.cs</span>
-          <span class="chip b">CajaMaderaMeshTool.cs</span>
-          <span class="chip b">RackEternityMeshTool.cs</span>
-        </div>
-      </div>
-    </div>
-    <div class="g-5-7">
-      <figure class="fig frag" style="height:266px">
-        <div class="box"><img src="../Img/codigo/Texturas/T_RackEternity_Atlas.png" alt="Atlas de textura del rack"></div>
-        <figcaption>Atlas <b>2×2</b> generado proceduralmente para el rack metálico Eternity.</figcaption>
-      </figure>
-      <div>
-        <div class="card frag mb16">
-          <h3>Bandeja hueca, no cubo cerrado</h3>
-          <p>Para el cajón y el rack &mdash;que necesitan un <strong>hueco interior</strong> donde apoyar o extraer las celdas&mdash; el mesh es una bandeja: piso, cuatro paredes exteriores, borde superior, cuatro paredes interiores y piso interior.</p>
-        </div>
-        <div class="card ok frag mb16">
-          <h3>Y los colliders acompañan</h3>
-          <p>La herramienta reemplaza los colliders por <strong>cinco <code>BoxCollider</code></strong> (piso + cuatro paredes) que respetan el hueco. Un <code>BoxCollider</code> sólido de <code>Cube</code> nativo <strong>impediría que las celdas se apoyen o se extraigan del interior</strong>.</p>
-        </div>
-        <div class="frag">
-          <p class="tiny">Cada herramienta ofrece dos entradas de menú: <b>&laquo;Generar mesh y aplicar&raquo;</b>, que busca en la escena todos los objetos que ya usan el material del prop; y <b>&laquo;Aplicar a la selección&raquo;</b>, útil para instancias nuevas.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="notes-src">El valor de esto es la <b>reproducibilidad</b>: cambiar el aspecto de un prop es editar un script de Python y volver a correr el menú, no reabrir un modelador. Es lo que permite reconfigurar el entorno para otras secuencias de ensamble.</div>
-</section>
-
-<!-- ============================================================
-     23 · CONCLUSIONES
+     22 · CONCLUSIONES
      ============================================================ -->
 <section class="slide" data-title="Conclusiones">
   <div class="s-head">
@@ -1628,7 +1546,7 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
     </div>
     <div class="frag">
       <div class="card tint" style="padding:26px 30px">
-        <p style="font-size:20px;line-height:1.55">El sistema cumple el objetivo planteado: un operario puede <strong>aprender a teleoperar el manipulador sin riesgo</strong>, con el mismo mando que usará en planta, y su desempeño puede <strong>medirse objetivamente</strong> durante todo el entrenamiento.</p>
+        <p style="font-size:var(--fs-1);line-height:1.5">El sistema cumple el objetivo planteado: un operario puede <strong>aprender a teleoperar el manipulador sin riesgo</strong>, con el mismo mando que usará en planta, y su desempeño puede <strong>medirse objetivamente</strong> durante todo el entrenamiento.</p>
       </div>
     </div>
   </div>
@@ -1644,9 +1562,9 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
   <div class="title-grid"></div>
   <div class="title-inner">
     <img class="title-logo" src="../Img/logo_fing_uncu.png" alt="UNCuyo · Facultad de Ingeniería">
-    <h1 style="font-size:66px">Gracias.</h1>
+    <h1 style="font-size:var(--fs-7)">Gracias.</h1>
     <div class="title-rule"></div>
-    <p style="font-size:22px;max-width:720px">Entrenamiento en entorno virtual para la teleoperación segura de brazos robóticos</p>
+    <p style="font-size:var(--fs-1);max-width:760px">Entrenamiento en entorno virtual para la teleoperación segura de brazos robóticos</p>
     <div class="title-people mt34">
       <div class="grp">
         <div class="lbl">Alumnos</div>
@@ -2001,6 +1919,38 @@ svg.diag .pulse{animation:pulse 2s ease-in-out infinite}
   var savedTheme = 'a';
   try { savedTheme = localStorage.getItem('rvTheme') || 'a'; } catch (e) {}
   setTheme(savedTheme);
+
+  /* ---------- escala de fuente en vivo ----------
+     Un solo control mueve --user-scale, que --fs-base y --sp-base
+     multiplican (ver :root). Así se agranda o achica TODO el texto
+     y el espaciado proporcionalmente, sin volver a tocar el CSS.
+     Los diagramas SVG quedan afuera a propósito: su geometría es
+     fija y escalarlos rompería las cajas. */
+  var FS_MIN = 0.75, FS_MAX = 1.4, FS_STEP = 0.05;
+  var fsDown = document.getElementById('fsDown');
+  var fsUp   = document.getElementById('fsUp');
+  var fsPct  = document.getElementById('fsPct');
+  var fsScale = 1;
+  function applyFontScale(){
+    document.documentElement.style.setProperty('--user-scale', fsScale.toFixed(2));
+    fsPct.textContent = Math.round(fsScale * 100) + '%';
+    fsDown.disabled = fsScale <= FS_MIN + 1e-6;
+    fsUp.disabled = fsScale >= FS_MAX - 1e-6;
+    try { localStorage.setItem('rvFontScale', fsScale.toFixed(2)); } catch (e) {}
+  }
+  fsDown.addEventListener('click', function(){
+    fsScale = Math.max(FS_MIN, +(fsScale - FS_STEP).toFixed(2));
+    applyFontScale();
+  });
+  fsUp.addEventListener('click', function(){
+    fsScale = Math.min(FS_MAX, +(fsScale + FS_STEP).toFixed(2));
+    applyFontScale();
+  });
+  try {
+    var savedScale = parseFloat(localStorage.getItem('rvFontScale'));
+    if (savedScale && savedScale >= FS_MIN && savedScale <= FS_MAX) fsScale = savedScale;
+  } catch (e) {}
+  applyFontScale();
 
   /* ---------- API de depuración ---------- */
   window.__deck = { go: go, next: next, prev: prev, animators: animators,
